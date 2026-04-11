@@ -1,13 +1,24 @@
-"""Lessie API integration — Owner: Becky"""
+"""Lessie API integration — Owner: Becky
+
+Two search paths:
+1. lessie CLI (find-people) — fast, structured results
+2. Lessie Web API (chat/stream) — creates conversation with share link
+
+We use CLI for search, then Web API to create a shareable conversation + link.
+"""
 
 import json
+import os
 import subprocess
+import httpx
+from datetime import datetime, timezone
 
 from models import AnalyzedTweet, PreparedReply
 
-LESSIE_SHARE_BASE = "https://app.lessie.ai/search"
+LESSIE_APP = "https://app.lessie.ai"
+LESSIE_JWT = os.getenv("LESSIE_JWT", "")
 
-REPLY_SYSTEM_PROMPT = """You are Leego, a growth hacker at Lessie AI. You write tweet replies.
+REPLY_SYSTEM_PROMPT = """You are Alex, a growth hacker at Lessie AI. You write tweet replies.
 
 Style:
 - Silicon Valley geek who genuinely loves helping people
@@ -27,14 +38,96 @@ BAD: "Check out these amazing results from Lessie AI!"
 BAD: "I found some people for you, here's the link" """
 
 
-def _call_lessie(search_data: dict) -> dict | None:
-    """Call lessie find-people with rich search params."""
+def _create_share_link(checkpoint: str) -> str | None:
+    """Create a Lessie web conversation and return a public share link.
+
+    1. POST to chat/stream with the search query → get conversation_id
+    2. POST to shares/v1 → get share_id
+    3. Return https://app.lessie.ai/share/{share_id}
+    """
+    jwt = LESSIE_JWT
+    if not jwt:
+        print("[bridge] No LESSIE_JWT configured, cannot create share link")
+        return None
+
+    headers = {
+        "Cookie": f"Authorization={jwt}",
+        "Content-Type": "application/json",
+        "Origin": LESSIE_APP,
+    }
+
+    # Step 1: Create conversation via stream
+    now = datetime.now(timezone.utc).isoformat(timespec="milliseconds").replace("+00:00", "Z")
+    stream_body = {
+        "messages": [{
+            "role": "user",
+            "content": checkpoint,
+            "id": f"msg_{int(datetime.now().timestamp())}",
+            "parts": [{"type": "text", "text": checkpoint}],
+            "peosonList": [],
+            "createdAt": now,
+        }],
+        "payload": {"task_id": "", "person_info_list": []},
+        "id": f"conv_{int(datetime.now().timestamp())}",
+    }
+
+    conversation_id = None
+    try:
+        with httpx.Client(timeout=120) as client:
+            with client.stream(
+                "POST",
+                f"{LESSIE_APP}/sourcing-api/chat/v1/stream",
+                headers=headers,
+                json=stream_body,
+            ) as response:
+                for line in response.iter_lines():
+                    if not line.startswith("data: "):
+                        continue
+                    try:
+                        data = json.loads(line[6:])
+                        if "conversation_id" in data:
+                            conversation_id = data["conversation_id"]
+                            break
+                    except json.JSONDecodeError:
+                        continue
+    except Exception as e:
+        print(f"[bridge] Stream failed: {e}")
+        return None
+
+    if not conversation_id:
+        print("[bridge] No conversation_id from stream")
+        return None
+
+    print(f"[bridge] Conversation created: {conversation_id}")
+
+    # Step 2: Wait for search to complete (stream is still running)
+    # We just need the conversation_id, the search runs server-side
+
+    # Step 3: Create public share link
+    try:
+        resp = httpx.post(
+            f"{LESSIE_APP}/sourcing-api/shares/v1",
+            headers=headers,
+            json={"conversation_id": conversation_id, "access_permission": 2},
+            timeout=30,
+        )
+        share_data = resp.json()
+        if share_data.get("code") == 200:
+            share_id = share_data["data"]["share_id"]
+            return f"{LESSIE_APP}/share/{share_id}"
+    except Exception as e:
+        print(f"[bridge] Share creation failed: {e}")
+
+    return None
+
+
+def _call_lessie_cli(search_data: dict) -> dict | None:
+    """Call lessie find-people CLI for structured results."""
     filter_obj = search_data.get("filter", {})
     checkpoint = search_data.get("checkpoint", "search")
     extra = search_data.get("extra", "")
     mode = search_data.get("search_mode", "b2b")
 
-    # Build filter JSON for Lessie CLI
     lessie_filter = {}
     if mode == "kol":
         if filter_obj.get("platform"):
@@ -42,7 +135,7 @@ def _call_lessie(search_data: dict) -> dict | None:
         if filter_obj.get("follower_min"):
             lessie_filter["follower_min"] = filter_obj["follower_min"]
         if filter_obj.get("content_topics"):
-            lessie_filter["content_topics"] = filter_obj["content_topics"]
+            lessie_filter["content_topics"] = filter_obj["content_topics"][:3]
     else:
         if filter_obj.get("person_titles"):
             lessie_filter["person_titles"] = filter_obj["person_titles"]
@@ -51,17 +144,11 @@ def _call_lessie(search_data: dict) -> dict | None:
         if filter_obj.get("person_seniorities"):
             lessie_filter["person_seniorities"] = filter_obj["person_seniorities"]
 
-    # Fallback: if filter is empty, use checkpoint as a title search
     if not lessie_filter:
         lessie_filter["person_titles"] = ["professional"]
 
-    # Platform field must be a single platform, not comma-separated
     if "platform" in lessie_filter and "," in str(lessie_filter["platform"]):
         lessie_filter["platform"] = lessie_filter["platform"].split(",")[0].strip()
-
-    # Limit content_topics to 3 to keep filter clean
-    if "content_topics" in lessie_filter:
-        lessie_filter["content_topics"] = lessie_filter["content_topics"][:3]
 
     cmd = [
         "lessie", "find-people",
@@ -76,16 +163,16 @@ def _call_lessie(search_data: dict) -> dict | None:
     try:
         result = subprocess.run(cmd, capture_output=True, text=True, timeout=180)
         if result.returncode != 0:
-            print(f"[bridge] Lessie error: {result.stderr[:200]}")
+            print(f"[bridge] Lessie CLI error: {result.stderr[:200]}")
             return None
         return json.loads(result.stdout)
     except (subprocess.TimeoutExpired, json.JSONDecodeError) as e:
-        print(f"[bridge] Lessie call failed: {e}")
+        print(f"[bridge] Lessie CLI failed: {e}")
         return None
 
 
 def _generate_reply(tweet: AnalyzedTweet, search_data: dict, total_found: int) -> str | None:
-    """Generate a personalized Alex-persona reply using Claude CLI."""
+    """Generate a personalized reply using Claude CLI."""
     profile = search_data.get("profile", {})
     prompt = (
         f"Original tweet by @{tweet.author}: \"{tweet.original_text}\"\n"
@@ -97,7 +184,8 @@ def _generate_reply(tweet: AnalyzedTweet, search_data: dict, total_found: int) -
 
     try:
         result = subprocess.run(
-            ["claude", "-p", prompt, "--system-prompt", REPLY_SYSTEM_PROMPT, "--output-format", "json"],
+            ["claude", "-p", prompt, "--system-prompt", REPLY_SYSTEM_PROMPT,
+             "--output-format", "json", "--model", "sonnet"],
             capture_output=True, text=True, timeout=30
         )
         if result.returncode != 0:
@@ -116,22 +204,26 @@ def _generate_reply(tweet: AnalyzedTweet, search_data: dict, total_found: int) -
 
 
 def search_lessie(tweet: AnalyzedTweet) -> PreparedReply | None:
-    """Search Lessie with rich context and generate personalized reply."""
+    """Search Lessie and generate personalized reply with share link."""
     search_data = json.loads(tweet.search_query)
+    checkpoint = search_data.get("checkpoint", "")
 
-    # 1. Search Lessie
-    lessie_result = _call_lessie(search_data)
-    if not lessie_result or not lessie_result.get("success"):
+    # 1. Search via CLI (fast, structured results)
+    lessie_result = _call_lessie_cli(search_data)
+    total_found = 0
+    if lessie_result and lessie_result.get("success"):
+        total_found = lessie_result.get("total_found", 0)
+
+    if total_found == 0:
         print(f"[bridge] No results for tweet {tweet.tweet_id}")
         return None
 
-    search_id = lessie_result["search_id"]
-    total_found = lessie_result.get("total_found", 0)
-    if total_found == 0:
-        return None
-
-    # 2. Build share URL
-    lessie_url = f"{LESSIE_SHARE_BASE}/{search_id}"
+    # 2. Create share link via Web API (uses the same checkpoint query)
+    print(f"[bridge] Creating share link...")
+    lessie_url = _create_share_link(checkpoint)
+    if not lessie_url:
+        lessie_url = "https://lessie.ai"  # fallback to homepage
+        print(f"[bridge] Share link failed, using fallback URL")
 
     # 3. Generate personalized reply
     reply_text = _generate_reply(tweet, search_data, total_found)
