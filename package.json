@@ -1,0 +1,11 @@
+{
+  "name": "lessie-twitter-employee",
+  "private": true,
+  "dependencies": {
+    "@lessie/cli": "^0.4.0"
+  },
+  "scripts": {
+    "setup": "npm install && lessie auth",
+    "status": "lessie status"
+  }
+}
