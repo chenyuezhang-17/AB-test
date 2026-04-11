@@ -1,0 +1,10 @@
+# Twitter
+tweepy>=4.14
+
+# HTTP
+httpx>=0.27
+
+# Config
+python-dotenv>=1.0
+
+# LLM (Claude via CLI, no SDK needed)
