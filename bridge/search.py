@@ -7,6 +7,7 @@ Two search paths:
 We use CLI for search, then Web API to create a shareable conversation + link.
 """
 
+from __future__ import annotations
 import json
 import os
 import subprocess

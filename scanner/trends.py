@@ -4,6 +4,7 @@ Fetches today's hot topics in tech/hiring/people space,
 converts them into Lessie search prompts.
 """
 
+from __future__ import annotations
 import json
 import subprocess
 from datetime import datetime
