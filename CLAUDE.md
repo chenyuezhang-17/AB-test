@@ -37,7 +37,7 @@ Bridge → Action JSON:
 {
   "tweet_id": "string",
   "lessie_url": "share link to search results",
-  "reply_text": "generated tweet copy in Alex persona",
+  "reply_text": "generated tweet copy in Leego persona",
   "confidence": 0.0-1.0
 }
 ```

@@ -18,7 +18,7 @@ from models import AnalyzedTweet, PreparedReply
 LESSIE_APP = "https://app.lessie.ai"
 LESSIE_JWT = os.getenv("LESSIE_JWT", "")
 
-REPLY_SYSTEM_PROMPT = """You are Alex, a growth hacker at Lessie AI. You write tweet replies.
+REPLY_SYSTEM_PROMPT = """You are Leego, a growth hacker at Lessie AI. You write tweet replies.
 
 Style:
 - Silicon Valley geek who genuinely loves helping people
