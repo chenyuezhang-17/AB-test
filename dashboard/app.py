@@ -562,33 +562,103 @@ def analytics():
 def tweets():
     conn = sqlite3.connect(DB_PATH)
     conn.row_factory = sqlite3.Row
-    all_tweets = conn.execute(
-        "SELECT * FROM activity_log WHERE stage='action' ORDER BY ts DESC LIMIT 50"
+
+    # Get full pipeline data: group by tweet_id to show the complete journey
+    all_items = conn.execute(
+        "SELECT * FROM activity_log ORDER BY tweet_id, ts ASC"
     ).fetchall()
     conn.close()
+
+    # Group by tweet_id
+    grouped = {}
+    for r in all_items:
+        tid = r['tweet_id'] or r['id']
+        if tid not in grouped:
+            grouped[tid] = {'scanner': None, 'reasoner': None, 'bridge': None, 'action': None}
+        grouped[tid][r['stage']] = dict(r)
+
+    # Build cards — only show items that have at least a scanner entry
+    cards_html = ""
+    for tid, stages in sorted(grouped.items(), key=lambda x: (x[1].get('action') or x[1].get('scanner') or {}).get('ts', ''), reverse=True):
+        scanner = stages.get('scanner')
+        reasoner = stages.get('reasoner')
+        bridge = stages.get('bridge')
+        action = stages.get('action')
+
+        if not scanner:
+            continue
+
+        author = scanner.get('author', '')
+        original_text = scanner.get('tweet_text', '')
+        is_scene1 = not author or (reasoner and reasoner.get('intent') == 'trend')
+        scene_label = 'S1 · Trend' if is_scene1 else 'S2 · Intent'
+        scene_color = '#0e7490' if is_scene1 else '#e8321a'
+
+        # Status
+        if action and action.get('status') == 'posted':
+            status_badge = '<span style="background:#166534;color:#bbf7d0;padding:2px 8px;border-radius:99px;font-size:0.75rem;font-weight:600;">Posted</span>'
+        elif reasoner and reasoner.get('status') == 'filtered':
+            status_badge = '<span style="background:#7f1d1d;color:#fecaca;padding:2px 8px;border-radius:99px;font-size:0.75rem;font-weight:600;">Filtered</span>'
+        elif bridge:
+            status_badge = '<span style="background:#ca8a04;color:#fef9c3;padding:2px 8px;border-radius:99px;font-size:0.75rem;font-weight:600;">Ready to Post</span>'
+        else:
+            status_badge = '<span style="background:#6b7280;color:#e5e7eb;padding:2px 8px;border-radius:99px;font-size:0.75rem;font-weight:600;">Processing</span>'
+
+        # Reply text and share link
+        reply_text = (action or {}).get('tweet_text', '')
+        lessie_url = (action or bridge or {}).get('lessie_url', '')
+        tweet_url = f"https://x.com/{author}/status/{tid}" if author and tid.startswith('tw_') is False else ''
+
+        # Confidence
+        conf = reasoner.get('confidence', 0) if reasoner else 0
+        conf_str = f"{conf*100:.0f}%" if conf else ''
+
+        # Framework / detail
+        detail = (reasoner or {}).get('detail', '')
+
+        # Build the card
+        cards_html += f'''
+        <div class="border-sketch-sm" style="padding:20px;margin-bottom:16px;background:#fff;cursor:pointer;" onclick="this.querySelector('.tweet-expand').style.display=this.querySelector('.tweet-expand').style.display==='none'?'block':'none'">
+          <div style="display:flex;align-items:center;gap:12px;margin-bottom:8px;">
+            <span style="background:{scene_color};color:white;padding:3px 10px;border-radius:99px;font-size:0.75rem;font-weight:600;">{scene_label}</span>
+            {status_badge}
+            <span style="color:var(--ink-muted);font-size:0.8rem;">{conf_str}</span>
+            <span style="color:var(--ink-muted);font-size:0.8rem;margin-left:auto;">{scanner.get("ts", "")[:19]}</span>
+          </div>
+          <div style="font-size:0.95rem;font-weight:600;margin-bottom:4px;">{"@" + author if author else "Trend Post"}</div>
+          <div style="font-size:0.88rem;color:var(--ink-light);line-height:1.5;">{original_text[:150]}{"..." if len(original_text) > 150 else ""}</div>
+          <div style="font-size:0.78rem;color:var(--ink-muted);margin-top:6px;">Click to expand ↓</div>
+
+          <div class="tweet-expand" style="display:none;margin-top:16px;padding-top:16px;border-top:1.5px solid var(--line);">
+            <div style="font-size:0.82rem;color:var(--ink-muted);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:8px;">Original Tweet</div>
+            <div style="font-size:0.9rem;color:var(--ink);line-height:1.6;padding:12px;background:var(--bg);border-radius:8px;margin-bottom:16px;">{original_text}</div>
+
+            {"<div style='margin-bottom:12px;'><span style='font-size:0.82rem;color:var(--ink-muted);'>Framework: </span><span style='font-size:0.85rem;color:#7c3aed;font-weight:600;'>" + detail + "</span></div>" if detail else ""}
+
+            {"<div style='font-size:0.82rem;color:var(--ink-muted);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:8px;'>Leego Reply</div><div id='reply-{tid}' style='font-size:0.9rem;color:var(--ink);line-height:1.6;padding:12px;background:#f0fdf4;border-radius:8px;border-left:3px solid #16a34a;margin-bottom:12px;'>" + reply_text + "</div>" if reply_text else ""}
+
+            <div style="display:flex;gap:8px;flex-wrap:wrap;">
+              {"<button onclick='event.stopPropagation();navigator.clipboard.writeText(document.getElementById(\"reply-" + tid + "\").innerText);this.textContent=\"Copied!\";setTimeout(()=>this.textContent=\"Copy Reply\",2000)' style='background:var(--ink);color:var(--paper);border:2px solid var(--ink);padding:8px 16px;border-radius:100px 4px 100px 4px/4px 100px 4px 100px;font-family:Space Grotesk,sans-serif;font-size:0.85rem;font-weight:600;cursor:pointer;'>Copy Reply</button>" if reply_text else ""}
+              {"<a href='" + lessie_url + "' target='_blank' onclick='event.stopPropagation()' style='display:inline-flex;align-items:center;background:transparent;color:#e8321a;border:2px solid #e8321a;padding:8px 16px;border-radius:4px 100px 4px 100px/100px 4px 100px 4px;font-family:Space Grotesk,sans-serif;font-size:0.85rem;font-weight:600;text-decoration:none;cursor:pointer;'>View Results ↗</a>" if lessie_url else ""}
+              {"<a href='https://x.com/intent/tweet?in_reply_to=" + tid + "' target='_blank' onclick='event.stopPropagation()' style='display:inline-flex;align-items:center;background:#1d9bf0;color:white;border:2px solid #1d9bf0;padding:8px 16px;border-radius:100px 4px 100px 4px/4px 100px 4px 100px;font-family:Space Grotesk,sans-serif;font-size:0.85rem;font-weight:600;text-decoration:none;cursor:pointer;'>Reply on X ↗</a>" if author and not is_scene1 else ""}
+              {"<a href='https://x.com/intent/tweet' target='_blank' onclick='event.stopPropagation()' style='display:inline-flex;align-items:center;background:#1d9bf0;color:white;border:2px solid #1d9bf0;padding:8px 16px;border-radius:100px 4px 100px 4px/4px 100px 4px 100px;font-family:Space Grotesk,sans-serif;font-size:0.85rem;font-weight:600;text-decoration:none;cursor:pointer;'>Post on X ↗</a>" if is_scene1 else ""}
+            </div>
+          </div>
+        </div>'''
 
     tweets_html = HTML.replace(
         '<!-- Stat cards -->',
         '''<!-- Tweets Content -->
-    <h2 style="font-family:'Caveat',cursive;font-size:1.6rem;margin-bottom:16px">All Posted Tweets</h2>
-    <div class="activity-list">''' + ''.join(
-        f'''<div class="activity-item">
-          <div class="activity-badge" style="background:{'#e8321a' if r['author'] else '#0e7490'};color:white">{'S2' if r['author'] else 'S1'}</div>
-          <div class="activity-content">
-            <div class="activity-title">{'@' + r['author'] if r['author'] else 'Trend Post'}</div>
-            <div class="activity-meta" style="max-width:600px">{r['tweet_text'] or ''}</div>
-            <div class="activity-meta">{r['ts'][:19]} · {r['status']}{' · ' + '<a href=\"' + r['lessie_url'] + '\" target=\"_blank\" style=\"color:#e8321a\">share link</a>' if r['lessie_url'] else ''}</div>
-          </div>
-        </div>'''
-        for r in all_tweets
-    ) + '''</div>
+    <h2 style="font-family:'Caveat',cursive;font-size:1.6rem;margin-bottom:16px">Pipeline Results</h2>
+    <div style="font-size:0.85rem;color:var(--ink-muted);margin-bottom:20px;">Click any card to expand → review → copy → post on X</div>
+    ''' + cards_html + '''
     <!-- Stat cards (hidden) -->'''
     ).replace(
         '<h1>Here\'s what Leego has been up to.</h1>',
         '<h1>Tweets</h1>'
     ).replace(
         'Your Twitter Digital Employee overview for today.',
-        'All tweets posted by Leego.'
+        'Review and post Leego\'s replies.'
     )
     tweets_html = tweets_html.replace('<!-- Engagement grid -->', '<!-- hidden --><!--').replace('<!-- Activity Log -->', '--><!-- Activity Log -->')
 
