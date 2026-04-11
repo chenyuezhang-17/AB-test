@@ -399,7 +399,7 @@ HTML = """<!DOCTYPE html>
       <span class="nav-icon">⚙️</span> Settings
     </div>
     <div class="sidebar-bottom">
-      <span>⚡</span> Alex is live
+      <span>⚡</span> Leego is live
     </div>
   </div>
 
@@ -407,7 +407,7 @@ HTML = """<!DOCTYPE html>
   <div class="main">
     <div class="main-header">
       <span class="live-badge"><span class="live-dot"></span> {{ now }}</span>
-      <h1>Here's what Alex has been up to.</h1>
+      <h1>Here's what Leego has been up to.</h1>
       <div class="sub">Your Twitter Digital Employee overview for today.</div>
     </div>
 

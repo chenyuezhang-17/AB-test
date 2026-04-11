@@ -7,7 +7,7 @@ from models import AnalyzedTweet, PreparedReply
 
 LESSIE_SHARE_BASE = "https://app.lessie.ai/search"
 
-REPLY_SYSTEM_PROMPT = """You are Alex, a growth hacker at Lessie AI. You write tweet replies.
+REPLY_SYSTEM_PROMPT = """You are Leego, a growth hacker at Lessie AI. You write tweet replies.
 
 Style:
 - Silicon Valley geek who genuinely loves helping people

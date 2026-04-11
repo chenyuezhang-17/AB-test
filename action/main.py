@@ -1,5 +1,5 @@
 """
-Action: Post quote retweets on Twitter as @alliiexia (Alex persona).
+Action: Post quote retweets on Twitter as @alliiexia (Leego persona).
 Uses OAuth 1.0a for user-context posting.
 """
 import os
@@ -35,7 +35,7 @@ def post_quote_retweet(tweet_id: str, reply_text: str, dry_run: bool = True) -> 
     return {"id": tweet_data["id"], "text": full_text}
 
 def build_reply_text(username: str, lessie_url: str, role_hint: str = "") -> str:
-    """Generate a human-like reply text in Alex's voice."""
+    """Generate a human-like reply text in Leego's voice."""
     role_part = f" for {role_hint}" if role_hint else ""
     templates = [
         f"ran a search on Lessie{role_part} — pulled a few solid profiles worth checking out 👇\n{lessie_url}",
