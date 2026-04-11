@@ -1,5 +1,6 @@
 """Shared data models for pipeline stages."""
 
+from __future__ import annotations
 from dataclasses import dataclass
 
 

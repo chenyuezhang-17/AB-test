@@ -7,11 +7,20 @@ Pipeline:
 4. Output: structured search params for bridge module
 """
 
+from __future__ import annotations
 import json
+import os
 import re
 import subprocess
 
+from dotenv import load_dotenv
 from models import ScannedTweet, AnalyzedTweet
+
+load_dotenv()
+CLAUDE_BIN = os.getenv(
+    "CLAUDE_BIN",
+    "/Users/lessie/Library/Application Support/Claude/claude-code/2.1.92/claude.app/Contents/MacOS/claude"
+)
 
 INTENT_PROMPT = """You analyze tweets to detect people-search intent.
 
@@ -93,7 +102,7 @@ def _call_claude(prompt: str, system: str) -> dict | None:
     """Call Claude CLI and parse JSON response."""
     try:
         result = subprocess.run(
-            ["claude", "-p", prompt, "--system-prompt", system,
+            [CLAUDE_BIN, "-p", prompt, "--system-prompt", system,
              "--output-format", "json", "--model", "sonnet"],
             capture_output=True, text=True, timeout=90
         )
@@ -125,7 +134,7 @@ def _research_author(tweet: ScannedTweet) -> dict:
         )
         if result.returncode == 0:
             person_raw = result.stdout[:1500]
-    except subprocess.TimeoutExpired:
+    except (subprocess.TimeoutExpired, FileNotFoundError):
         pass
 
     # 2. If bio mentions a company, try to enrich it (1 credit)
@@ -149,7 +158,7 @@ def _research_author(tweet: ScannedTweet) -> dict:
                             )
                             if result2.returncode == 0:
                                 company_raw = result2.stdout[:1500]
-            except (subprocess.TimeoutExpired, json.JSONDecodeError):
+            except (subprocess.TimeoutExpired, json.JSONDecodeError, FileNotFoundError):
                 pass
 
     # 3. Synthesize with Claude
