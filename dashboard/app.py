@@ -131,7 +131,7 @@ HTML = """<!DOCTYPE html>
   <meta charset="utf-8">
   <meta http-equiv="refresh" content="15">
   <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link href="https://fonts.googleapis.com/css2?family=Caveat:wght@400;500;600;700&family=Inter:wght@400;500&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Caveat:wght@400;500;600;700&family=Space+Grotesk:wght@400;500;600&display=swap" rel="stylesheet">
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -147,7 +147,7 @@ HTML = """<!DOCTYPE html>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
     body {
-      font-family: 'Caveat', cursive;
+      font-family: 'Space Grotesk', sans-serif;
       background: var(--bg);
       color: var(--ink);
       min-height: 100vh;
@@ -355,7 +355,7 @@ HTML = """<!DOCTYPE html>
       flex-shrink: 0;
       background: rgba(54,69,217,0.08);
       color: #3645d9;
-      font-family: 'Inter', sans-serif;
+      font-family: 'Space Grotesk', sans-serif;
     }
     .activity-avatar.red { background: rgba(232,50,26,0.08); color: var(--red); }
     .activity-content { flex: 1; min-width: 0; }
@@ -386,18 +386,18 @@ HTML = """<!DOCTYPE html>
   <div class="sidebar">
     <div class="brand">Lessie.ai</div>
     <div class="brand-line"></div>
-    <div class="nav-item active">
+    <a href="/" class="nav-item {% if page == 'dashboard' %}active{% endif %}" style="text-decoration:none;color:inherit">
       <span class="nav-icon">🏠</span> Dashboard
-    </div>
-    <div class="nav-item">
+    </a>
+    <a href="/analytics" class="nav-item {% if page == 'analytics' %}active{% endif %}" style="text-decoration:none;color:inherit">
       <span class="nav-icon">📊</span> Analytics
-    </div>
-    <div class="nav-item">
+    </a>
+    <a href="/tweets" class="nav-item {% if page == 'tweets' %}active{% endif %}" style="text-decoration:none;color:inherit">
       <span class="nav-icon">🐦</span> Tweets
-    </div>
-    <div class="nav-item">
+    </a>
+    <a href="/settings" class="nav-item {% if page == 'settings' %}active{% endif %}" style="text-decoration:none;color:inherit">
       <span class="nav-icon">⚙️</span> Settings
-    </div>
+    </a>
     <div class="sidebar-bottom">
       <span>⚡</span> Leego is live
     </div>
@@ -490,7 +490,135 @@ HTML = """<!DOCTYPE html>
 def index():
     refresh_engagement()
     stats = get_stats()
-    return render_template_string(HTML, stats=stats, now=datetime.now().strftime("%H:%M:%S"))
+    return render_template_string(HTML, stats=stats, now=datetime.now().strftime("%H:%M:%S"), page="dashboard")
+
+@app.route("/analytics")
+def analytics():
+    conn = sqlite3.connect(DB_PATH)
+    conn.row_factory = sqlite3.Row
+
+    # Pipeline conversion funnel
+    scanned = conn.execute("SELECT COUNT(*) FROM activity_log WHERE stage='scanner'").fetchone()[0]
+    passed = conn.execute("SELECT COUNT(*) FROM activity_log WHERE stage='reasoner' AND status='passed'").fetchone()[0]
+    filtered = conn.execute("SELECT COUNT(*) FROM activity_log WHERE stage='reasoner' AND status='filtered'").fetchone()[0]
+    bridge_ready = conn.execute("SELECT COUNT(*) FROM activity_log WHERE stage='bridge' AND status='ready'").fetchone()[0]
+    posted = conn.execute("SELECT COUNT(*) FROM activity_log WHERE stage='action' AND status='posted'").fetchone()[0]
+
+    # Scene breakdown
+    scene1 = conn.execute("SELECT COUNT(*) FROM activity_log WHERE detail LIKE '%Scene 1%'").fetchone()[0]
+    scene2 = conn.execute("SELECT COUNT(*) FROM activity_log WHERE detail LIKE '%Scene 2%'").fetchone()[0]
+
+    # Intent distribution
+    intents = conn.execute(
+        "SELECT intent, COUNT(*) as cnt FROM activity_log WHERE stage='reasoner' AND intent IS NOT NULL GROUP BY intent ORDER BY cnt DESC"
+    ).fetchall()
+
+    # Framework distribution
+    frameworks = conn.execute(
+        "SELECT detail, COUNT(*) as cnt FROM activity_log WHERE stage='reasoner' AND status='passed' AND detail LIKE 'Framework%' GROUP BY detail ORDER BY cnt DESC"
+    ).fetchall()
+
+    conn.close()
+
+    analytics_html = HTML.replace(
+        '<!-- Stat cards -->',
+        '''<!-- Analytics Content -->
+    <h2 style="font-family:'Caveat',cursive;font-size:1.6rem;margin-bottom:16px">Pipeline Funnel</h2>
+    <div class="cards">
+      <div class="stat-card"><div class="card-label">Scanned</div><div class="card-number">''' + str(scanned) + '''</div></div>
+      <div class="stat-card"><div class="card-label">Passed Reasoner</div><div class="card-number">''' + str(passed) + '''</div></div>
+      <div class="stat-card"><div class="card-label">Filtered Out</div><div class="card-number">''' + str(filtered) + '''</div></div>
+      <div class="stat-card"><div class="card-label">Bridge Ready</div><div class="card-number">''' + str(bridge_ready) + '''</div></div>
+      <div class="stat-card"><div class="card-label">Posted</div><div class="card-number">''' + str(posted) + '''</div></div>
+    </div>
+    <div style="margin-top:24px" class="cards">
+      <div class="stat-card"><div class="card-label">Scene 1: Trends</div><div class="card-number">''' + str(scene1) + '''</div></div>
+      <div class="stat-card"><div class="card-label">Scene 2: Intent</div><div class="card-number">''' + str(scene2) + '''</div></div>
+    </div>
+    <h2 style="font-family:'Caveat',cursive;font-size:1.6rem;margin:24px 0 12px">Intent Distribution</h2>
+    <div class="activity-list">''' + ''.join(
+        f'<div class="activity-item"><div class="activity-badge" style="background:#0e7490;color:#cffafe">{r["intent"]}</div><div class="activity-content"><div class="activity-title">{r["cnt"]} tweets</div></div></div>'
+        for r in intents
+    ) + '''</div>
+    <h2 style="font-family:'Caveat',cursive;font-size:1.6rem;margin:24px 0 12px">Frameworks Used</h2>
+    <div class="activity-list">''' + ''.join(
+        f'<div class="activity-item"><div class="activity-badge" style="background:#7c3aed;color:#ede9fe">FR</div><div class="activity-content"><div class="activity-title">{r["detail"]}</div><div class="activity-meta">{r["cnt"]}x</div></div></div>'
+        for r in frameworks
+    ) + '''</div>
+    <!-- Stat cards (hidden) -->'''
+    ).replace(
+        '<h1>Here\'s what Leego has been up to.</h1>',
+        '<h1>Analytics</h1>'
+    ).replace(
+        'Your Twitter Digital Employee overview for today.',
+        'Pipeline performance and conversion metrics.'
+    )
+    # Hide the engagement + activity sections on analytics page
+    analytics_html = analytics_html.replace('<!-- Engagement grid -->', '<!-- hidden --><!--').replace('<!-- Activity Log -->', '--><!-- Activity Log -->')
+
+    return render_template_string(analytics_html, stats=get_stats(), now=datetime.now().strftime("%H:%M:%S"), page="analytics")
+
+@app.route("/tweets")
+def tweets():
+    conn = sqlite3.connect(DB_PATH)
+    conn.row_factory = sqlite3.Row
+    all_tweets = conn.execute(
+        "SELECT * FROM activity_log WHERE stage='action' ORDER BY ts DESC LIMIT 50"
+    ).fetchall()
+    conn.close()
+
+    tweets_html = HTML.replace(
+        '<!-- Stat cards -->',
+        '''<!-- Tweets Content -->
+    <h2 style="font-family:'Caveat',cursive;font-size:1.6rem;margin-bottom:16px">All Posted Tweets</h2>
+    <div class="activity-list">''' + ''.join(
+        f'''<div class="activity-item">
+          <div class="activity-badge" style="background:{'#e8321a' if r['author'] else '#0e7490'};color:white">{'S2' if r['author'] else 'S1'}</div>
+          <div class="activity-content">
+            <div class="activity-title">{'@' + r['author'] if r['author'] else 'Trend Post'}</div>
+            <div class="activity-meta" style="max-width:600px">{r['tweet_text'] or ''}</div>
+            <div class="activity-meta">{r['ts'][:19]} · {r['status']}{' · ' + '<a href=\"' + r['lessie_url'] + '\" target=\"_blank\" style=\"color:#e8321a\">share link</a>' if r['lessie_url'] else ''}</div>
+          </div>
+        </div>'''
+        for r in all_tweets
+    ) + '''</div>
+    <!-- Stat cards (hidden) -->'''
+    ).replace(
+        '<h1>Here\'s what Leego has been up to.</h1>',
+        '<h1>Tweets</h1>'
+    ).replace(
+        'Your Twitter Digital Employee overview for today.',
+        'All tweets posted by Leego.'
+    )
+    tweets_html = tweets_html.replace('<!-- Engagement grid -->', '<!-- hidden --><!--').replace('<!-- Activity Log -->', '--><!-- Activity Log -->')
+
+    return render_template_string(tweets_html, stats=get_stats(), now=datetime.now().strftime("%H:%M:%S"), page="tweets")
+
+@app.route("/settings")
+def settings():
+    import os
+    settings_html = HTML.replace(
+        '<!-- Stat cards -->',
+        '''<!-- Settings Content -->
+    <h2 style="font-family:'Caveat',cursive;font-size:1.6rem;margin-bottom:16px">Configuration</h2>
+    <div class="activity-list">
+      <div class="activity-item"><div class="activity-badge" style="background:#166534;color:#bbf7d0">OK</div><div class="activity-content"><div class="activity-title">Lessie CLI</div><div class="activity-meta">''' + ('Authorized' if os.path.exists(os.path.expanduser('~/.lessie/oauth.json')) else 'Not configured — run: lessie auth') + '''</div></div></div>
+      <div class="activity-item"><div class="activity-badge" style="background:''' + ('#166534' if os.getenv('TIKHUB_API_KEY') else '#7f1d1d') + ''';color:''' + ('#bbf7d0' if os.getenv('TIKHUB_API_KEY') else '#fecaca') + '''">''' + ('OK' if os.getenv('TIKHUB_API_KEY') else '!!') + '''</div><div class="activity-content"><div class="activity-title">TikHub API</div><div class="activity-meta">''' + ('Configured' if os.getenv('TIKHUB_API_KEY') else 'Missing — add TIKHUB_API_KEY to .env') + '''</div></div></div>
+      <div class="activity-item"><div class="activity-badge" style="background:''' + ('#166534' if os.getenv('TWITTER_API_KEY') else '#7f1d1d') + ''';color:''' + ('#bbf7d0' if os.getenv('TWITTER_API_KEY') else '#fecaca') + '''">''' + ('OK' if os.getenv('TWITTER_API_KEY') else '!!') + '''</div><div class="activity-content"><div class="activity-title">Twitter API</div><div class="activity-meta">''' + ('Configured' if os.getenv('TWITTER_API_KEY') else 'Missing — add Twitter keys to .env') + '''</div></div></div>
+      <div class="activity-item"><div class="activity-badge" style="background:''' + ('#166534' if os.getenv('LESSIE_JWT') else '#7f1d1d') + ''';color:''' + ('#bbf7d0' if os.getenv('LESSIE_JWT') else '#fecaca') + '''">''' + ('OK' if os.getenv('LESSIE_JWT') else '!!') + '''</div><div class="activity-content"><div class="activity-title">Lessie JWT (Share Links)</div><div class="activity-meta">''' + ('Configured' if os.getenv('LESSIE_JWT') else 'Missing — add LESSIE_JWT to .env') + '''</div></div></div>
+      <div class="activity-item"><div class="activity-badge" style="background:#0e7490;color:#cffafe">ℹ️</div><div class="activity-content"><div class="activity-title">DRY_RUN Mode</div><div class="activity-meta">''' + ('ON — tweets will NOT be posted' if os.getenv('DRY_RUN', 'true').lower() == 'true' else 'OFF — tweets WILL be posted to Twitter') + '''</div></div></div>
+    </div>
+    <!-- Stat cards (hidden) -->'''
+    ).replace(
+        '<h1>Here\'s what Leego has been up to.</h1>',
+        '<h1>Settings</h1>'
+    ).replace(
+        'Your Twitter Digital Employee overview for today.',
+        'API keys and pipeline configuration status.'
+    )
+    settings_html = settings_html.replace('<!-- Engagement grid -->', '<!-- hidden --><!--').replace('<!-- Activity Log -->', '--><!-- Activity Log -->')
+
+    return render_template_string(settings_html, stats=get_stats(), now=datetime.now().strftime("%H:%M:%S"), page="settings")
 
 @app.route("/api/stats")
 def api_stats():
