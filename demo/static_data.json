@@ -1,0 +1,141 @@
+[
+  {
+    "tweet_id": "demo_001",
+    "author": "toaborhese",
+    "author_bio": "CTO @DataflowLabs | Building AI-powered search | Ex-Google | Stanford CS",
+    "original_text": "Looking for a senior AI/ML engineer to join our team. Must have experience with LLMs and retrieval systems. Remote OK, US-based preferred. DM me.",
+    "pipeline_result": {
+      "status": "ready",
+      "intent": "hiring",
+      "confidence": 0.97,
+      "framework": "?",
+      "checkpoint": "Target senior AI/ML engineers currently or recently employed at DataflowLabs' direct competitors: Pinecone, Weaviate, Qdrant, Vectara, Glean, Coveo, or Elasticsearch. These are engineers with hands-on RAG pipeline, dense/sparse hybrid retrieval, and LLM integration experience at the exact product depth DataflowLabs is building. US-based (or remote-eligible) senior/staff-level ICs are the bullseye — especially anyone who has shipped a retrieval or embedding layer in production.",
+      "aha_factor": "",
+      "profile": {
+        "name": "@toaborhese",
+        "role": "CTO",
+        "company": "DataflowLabs",
+        "industry": "AI-Powered Search / Enterprise Search Infrastructure",
+        "company_stage": "startup",
+        "competitors": [
+          "Algolia",
+          "Glean",
+          "Vectara",
+          "Weaviate",
+          "Qdrant",
+          "Pinecone",
+          "Coveo",
+          "Elasticsearch"
+        ],
+        "pain_context": "CTO of an AI search startup actively scaling their core engineering team — specifically hunting for senior AI/ML talent with LLM + retrieval system depth. This signals they are at a product-building inflection point: the retrieval architecture (likely RAG or hybrid dense/sparse search) is central to their product and they need senior IC ownership, not just generalist ML. Ex-Google background suggests high hiring bar; posting on Twitter rather than LinkedIn implies urgency or a preference for community-native technical talent.",
+        "platforms_relevant": [
+          "linkedin",
+          "twitter",
+          "github"
+        ],
+        "geo_hints": [
+          "United States",
+          "Remote",
+          "San Francisco Bay Area (probable — Ex-Google + Stanford CS pedigree)"
+        ]
+      },
+      "reply_text": "pulled 50 senior AI/ML engineers from Pinecone, Weaviate, Qdrant, Glean etc — all with production RAG/retrieval experience, US-based. some have shipped embedding layers you'd probably want to poach 👀\nhttps://app.lessie.ai/search/mcp_b94728f9cd4f",
+      "lessie_url": "https://app.lessie.ai/search/mcp_b94728f9cd4f"
+    },
+    "generic_search": "title: Looking for a senior AI/ML engineer to join our team"
+  },
+  {
+    "tweet_id": "demo_002",
+    "author": "lenaboroditsky",
+    "author_bio": "Head of Growth @LinguaFlow | Language tech | Previously @Duolingo",
+    "original_text": "Anyone know content creators who focus on language learning tools? We need reviewers for our new translation feature launch in Latin America.",
+    "pipeline_result": {
+      "status": "ready",
+      "intent": "recommendation",
+      "confidence": 0.93,
+      "framework": "?",
+      "checkpoint": "Find bilingual (Spanish/Portuguese + English) content creators in Latin America — Mexico, Brazil, Argentina, Colombia, Chile — who actively review or demo language learning apps like Duolingo, Babbel, Busuu, or Memrise. Target micro to mid-tier KOLs (20K–500K followers) on YouTube, TikTok, or Instagram who post tutorials, app comparisons, or 'learn English/Spanish with me' content in Spanish or Portuguese. Prioritize creators with high comment engagement and a history of sponsored or organic language app reviews.",
+      "aha_factor": "",
+      "profile": {
+        "name": "Lena Boroditsky",
+        "role": "Head of Growth",
+        "company": "LinguaFlow",
+        "industry": "Language Tech / EdTech",
+        "company_stage": "startup",
+        "competitors": [
+          "Duolingo",
+          "Babbel",
+          "Rosetta Stone",
+          "Busuu",
+          "Pimsleur",
+          "Memrise",
+          "italki",
+          "Preply"
+        ],
+        "pain_context": "Launching a new translation feature targeting Latin America and needs language-learning content creators to act as reviewers and amplifiers. As Head of Growth, she is running a KOL/influencer seeding campaign pre- or at-launch — classic growth motion to build social proof and regional awareness before broader paid acquisition.",
+        "platforms_relevant": [
+          "youtube",
+          "tiktok",
+          "instagram",
+          "twitter"
+        ],
+        "geo_hints": [
+          "Latin America",
+          "Mexico",
+          "Brazil",
+          "Argentina",
+          "Colombia",
+          "Chile"
+        ]
+      },
+      "reply_text": "ran a search for bilingual content creators in LATAM who review language apps — got 50 across YouTube/TikTok/IG, mostly Spanish & Portuguese speakers doing app comparisons and tutorials. solid mix of micro to mid-tier with real engagement 🎯\nhttps://app.lessie.ai/search/mcp_9c4d2029b81e",
+      "lessie_url": "https://app.lessie.ai/search/mcp_9c4d2029b81e"
+    },
+    "generic_search": "title: Anyone know content creators who focus on language learning tools? We need reviewers for our new translation feature launch in Latin America"
+  },
+  {
+    "tweet_id": "demo_003",
+    "author": "marcustech_",
+    "author_bio": "CEO @PayStack | YC W24 | Building the Stripe for Africa",
+    "original_text": "Hiring a product designer for our fintech startup. Need someone who's worked on payment flows and compliance UX. NYC preferred but open to remote.",
+    "pipeline_result": {
+      "status": "ready",
+      "intent": "hiring",
+      "confidence": 0.97,
+      "framework": "?",
+      "checkpoint": "Search for senior product designers with verifiable fintech UX portfolios — specifically payment flow design (checkout, onboarding, KYC/KYB screens) and compliance-heavy UX (identity verification, AML friction reduction). Target designers who have shipped at Flutterwave, Stripe, Chipper Cash, Interswitch, Nala, Moov, or similar African/emerging-market payment infra companies. Prioritize NYC-based or remote-friendly candidates with 4–8 years experience; open to diaspora designers bridging US ↔ West Africa markets.",
+      "aha_factor": "",
+      "profile": {
+        "name": "Marcus",
+        "role": "CEO",
+        "company": "PayStack",
+        "industry": "Fintech / African Payments Infrastructure",
+        "company_stage": "startup",
+        "competitors": [
+          "Flutterwave",
+          "Chipper Cash",
+          "Interswitch",
+          "Peach Payments",
+          "Nala",
+          "DPO Group",
+          "MTN MoMo"
+        ],
+        "pain_context": "Early-stage CEO (YC W24) actively scaling product team — hiring a designer who can own payment flow UX and navigate compliance/KYC friction, likely because they're hitting regulatory complexity across African markets and need to professionalize checkout/onboarding UX fast. Posting publicly signals urgency and limited recruiting bandwidth.",
+        "platforms_relevant": [
+          "linkedin",
+          "twitter"
+        ],
+        "geo_hints": [
+          "NYC",
+          "Nigeria",
+          "West Africa",
+          "Sub-Saharan Africa",
+          "remote"
+        ]
+      },
+      "reply_text": "pulled 50 senior product designers with payment flow + compliance UX chops — a bunch shipped at Stripe, Flutterwave, Chipper Cash. mix of NYC and remote 🔥\nhttps://app.lessie.ai/search/mcp_49ef67b29365",
+      "lessie_url": "https://app.lessie.ai/search/mcp_49ef67b29365"
+    },
+    "generic_search": "title: Hiring a product designer for our fintech startup"
+  }
+]

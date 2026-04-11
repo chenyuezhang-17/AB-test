@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Lessie Twitter Digital Employee — Demo</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #0a0a0a; color: #e4e4e7; line-height: 1.6; }
+
+    .hero { text-align: center; padding: 60px 24px 40px; }
+    .hero h1 { font-size: 2.2rem; font-weight: 700; color: #fff; }
+    .hero p { color: #a1a1aa; font-size: 1.05rem; margin-top: 8px; max-width: 600px; margin-left: auto; margin-right: auto; }
+
+    .pipeline { display: flex; justify-content: center; gap: 8px; margin: 32px auto; flex-wrap: wrap; }
+    .step { background: #18181b; border: 1px solid #27272a; border-radius: 10px; padding: 12px 20px; font-size: 0.85rem; }
+    .step .label { color: #71717a; font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.05em; }
+    .step .name { color: #38bdf8; font-weight: 600; }
+    .arrow { color: #3f3f46; font-size: 1.2rem; display: flex; align-items: center; }
+
+    .cases { max-width: 1100px; margin: 0 auto; padding: 0 24px 60px; }
+    .case { margin-bottom: 48px; }
+    .case-header { margin-bottom: 20px; }
+    .tweet-box { background: #18181b; border: 1px solid #27272a; border-radius: 12px; padding: 20px; margin-bottom: 20px; }
+    .tweet-author { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+    .tweet-author .handle { color: #38bdf8; font-weight: 600; }
+    .tweet-author .bio { color: #71717a; font-size: 0.8rem; }
+    .tweet-text { font-size: 1rem; color: #d4d4d8; }
+
+    .comparison { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+    @media (max-width: 768px) { .comparison { grid-template-columns: 1fr; } }
+
+    .panel { border-radius: 12px; padding: 20px; }
+    .panel.before { background: #1c1917; border: 1px solid #44403c; }
+    .panel.after { background: #052e16; border: 1px solid #166534; }
+    .panel-tag { font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.08em; font-weight: 700; margin-bottom: 12px; }
+    .panel.before .panel-tag { color: #a8a29e; }
+    .panel.after .panel-tag { color: #4ade80; }
+    .panel h3 { font-size: 0.85rem; color: #a1a1aa; margin-bottom: 6px; }
+    .panel .search-query { font-size: 0.9rem; color: #d4d4d8; margin-bottom: 16px; padding: 12px; background: rgba(0,0,0,0.3); border-radius: 8px; }
+    .panel.after .search-query { color: #bbf7d0; }
+
+    .profile-pills { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 12px; }
+    .pill { background: rgba(56,189,248,0.15); color: #38bdf8; font-size: 0.75rem; padding: 3px 10px; border-radius: 99px; }
+
+    .reply-box { background: rgba(0,0,0,0.2); border-radius: 8px; padding: 14px; margin-top: 12px; }
+    .reply-box .reply-label { font-size: 0.7rem; color: #71717a; text-transform: uppercase; margin-bottom: 6px; }
+    .reply-box .reply-text { font-size: 0.9rem; color: #fafafa; }
+    .reply-box a { color: #38bdf8; text-decoration: none; }
+    .reply-box a:hover { text-decoration: underline; }
+
+    .badge { display: inline-block; padding: 2px 8px; border-radius: 99px; font-size: 0.7rem; font-weight: 600; }
+    .badge.framework { background: #7c3aed; color: #ede9fe; }
+    .badge.intent { background: #0e7490; color: #cffafe; }
+    .badge.confidence { background: #166534; color: #bbf7d0; }
+
+    .competitors { margin-top: 10px; }
+    .competitors span { color: #fb923c; font-size: 0.8rem; }
+  </style>
+</head>
+<body>
+
+<div class="hero">
+  <h1>Lessie Twitter Digital Employee</h1>
+  <p>Automatically detects people-search intent on Twitter, researches the author, generates hyper-specific searches, and replies with curated results.</p>
+</div>
+
+<div class="pipeline">
+  <div class="step"><div class="label">Step 1</div><div class="name">Scanner</div></div>
+  <div class="arrow">→</div>
+  <div class="step"><div class="label">Step 2</div><div class="name">Reasoner</div></div>
+  <div class="arrow">→</div>
+  <div class="step"><div class="label">Step 3</div><div class="name">Bridge</div></div>
+  <div class="arrow">→</div>
+  <div class="step"><div class="label">Step 4</div><div class="name">Action</div></div>
+</div>
+
+<div class="cases" id="cases"></div>
+
+<script>
+const data = [
+  {
+    author: "@toaborhese",
+    bio: "CTO @DataflowLabs | Building AI-powered search | Ex-Google | Stanford CS",
+    tweet: "Looking for a senior AI/ML engineer to join our team. Must have experience with LLMs and retrieval systems. Remote OK, US-based preferred. DM me.",
+    generic: "AI/ML Engineer, United States",
+    framework: "B",
+    intent: "hiring",
+    confidence: 0.97,
+    competitors: ["Algolia", "Glean", "Vectara", "Weaviate", "Qdrant", "Pinecone", "Coveo"],
+    checkpoint: "Target senior AI/ML engineers currently or recently employed at DataflowLabs' direct competitors: Pinecone, Weaviate, Qdrant, Vectara, Glean, Coveo, or Elasticsearch. These are engineers with hands-on RAG pipeline, dense/sparse hybrid retrieval, and LLM integration experience at the exact product depth DataflowLabs is building.",
+    reply: "pulled 50 senior AI/ML engineers from Pinecone, Weaviate, Qdrant, Glean etc — all with production RAG/retrieval experience, US-based. some have shipped embedding layers you'd probably want to poach 👀",
+    url: "https://app.lessie.ai/search/mcp_b94728f9cd4f",
+  },
+  {
+    author: "@lenaboroditsky",
+    bio: "Head of Growth @LinguaFlow | Language tech | Previously @Duolingo",
+    tweet: "Anyone know content creators who focus on language learning tools? We need reviewers for our new translation feature launch in Latin America.",
+    generic: "content creators, language learning",
+    framework: "D",
+    intent: "recommendation",
+    confidence: 0.93,
+    competitors: ["Duolingo", "Babbel", "Rosetta Stone", "Busuu", "Memrise", "italki"],
+    checkpoint: "Find bilingual (Spanish/Portuguese + English) content creators in Latin America who actively review or demo language learning apps like Duolingo, Babbel, Busuu, or Memrise. Target micro to mid-tier KOLs (20K–500K followers) on YouTube, TikTok, or Instagram who post tutorials, app comparisons, or 'learn English/Spanish with me' content.",
+    reply: "ran a search for bilingual content creators in LATAM who review language apps — got 50 across YouTube/TikTok/IG, mostly Spanish & Portuguese speakers doing app comparisons and tutorials 🎯",
+    url: "https://app.lessie.ai/search/mcp_9c4d2029b81e",
+  },
+  {
+    author: "@marcustech_",
+    bio: "CEO @PayStack | YC W24 | Building the Stripe for Africa",
+    tweet: "Hiring a product designer for our fintech startup. Need someone who's worked on payment flows and compliance UX. NYC preferred but open to remote.",
+    generic: "product designer, fintech, NYC",
+    framework: "B",
+    intent: "hiring",
+    confidence: 0.97,
+    competitors: ["Flutterwave", "Chipper Cash", "Interswitch", "Nala", "DPO Group"],
+    checkpoint: "Search for senior product designers with verifiable fintech UX portfolios — specifically payment flow design (checkout, onboarding, KYC/KYB screens) and compliance-heavy UX. Target designers who have shipped at Flutterwave, Stripe, Chipper Cash, Interswitch, Nala, or similar African/emerging-market payment infra companies.",
+    reply: "pulled 50 senior product designers with payment flow + compliance UX chops — a bunch shipped at Stripe, Flutterwave, Chipper Cash. mix of NYC and remote 🔥",
+    url: "https://app.lessie.ai/search/mcp_49ef67b29365",
+  }
+];
+
+const container = document.getElementById('cases');
+
+data.forEach((d, i) => {
+  container.innerHTML += `
+    <div class="case">
+      <div class="tweet-box">
+        <div class="tweet-author">
+          <span class="handle">${d.author}</span>
+          <span class="bio">${d.bio}</span>
+        </div>
+        <div class="tweet-text">${d.tweet}</div>
+      </div>
+
+      <div style="margin-bottom:12px">
+        <span class="badge framework">Framework ${d.framework}</span>
+        <span class="badge intent">${d.intent}</span>
+        <span class="badge confidence">${Math.round(d.confidence*100)}% confidence</span>
+      </div>
+
+      <div class="competitors">
+        <span>Competitors identified: ${d.competitors.join(' · ')}</span>
+      </div>
+
+      <div class="comparison" style="margin-top:16px">
+        <div class="panel before">
+          <div class="panel-tag">❌ Generic Search</div>
+          <h3>Search query</h3>
+          <div class="search-query">${d.generic}</div>
+          <h3>What the user gets</h3>
+          <div class="search-query">Thousands of vaguely relevant profiles. No context, no specificity. User has to manually filter.</div>
+        </div>
+
+        <div class="panel after">
+          <div class="panel-tag">✅ Lessie Pipeline</div>
+          <h3>Search query (auto-generated)</h3>
+          <div class="search-query">${d.checkpoint}</div>
+          <h3>Auto-generated reply</h3>
+          <div class="reply-box">
+            <div class="reply-text">${d.reply}<br><a href="${d.url}" target="_blank">${d.url}</a></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  `;
+});
+</script>
+
+</body>
+</html>
