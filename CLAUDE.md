@@ -4,9 +4,43 @@
 Twitter 数字员工：自动抓取推特上的找人需求，生成 Lessie 搜索结果，通过引用转发回复。
 Hackathon MVP — "先提供价值，再建立认知"。
 
-## Team
+## Team & Division of Work
+
 - **Becky (chenyuezhang-17)** — Project lead, Lessie product expert
-- **Alexia (alexiayx)** — Collaborator
+- **Alexia (alexiayx)** — Collaborator, Twitter API owner
+
+### Module Ownership
+
+| Module | Owner | Scope |
+|--------|-------|-------|
+| `reasoner/` | Becky | LLM intent analysis + prompt engineering (Claude CLI) |
+| `bridge/` | Becky | Lessie API integration + share link generation |
+| `scanner/` | Alexia | Twitter data fetching via API (credentials on her account) |
+| `action/` | Alexia | Tweet posting / quote repost (requires Twitter API) |
+| `dashboard/` | TBD | Simple review UI, lowest priority for MVP |
+
+### Interface Contract
+
+Scanner → Reasoner JSON:
+```json
+{
+  "tweet_id": "string",
+  "author": "string",
+  "intent": "hiring | looking_for | recommendation",
+  "search_query": "extracted search terms",
+  "original_text": "raw tweet text"
+}
+```
+
+Bridge → Action JSON:
+```json
+{
+  "tweet_id": "string",
+  "lessie_url": "share link to search results",
+  "reply_text": "generated tweet copy in Alex persona",
+  "confidence": 0.0-1.0
+}
+```
 
 ## Language
 - 代码注释和 commit message 用英文
