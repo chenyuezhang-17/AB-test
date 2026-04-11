@@ -39,10 +39,10 @@ def fetch_trends() -> list[dict]:
     seen = set()
 
     queries = [
-        f"trending tech topics Twitter {today}",
-        f"trending hiring layoffs startup news {today}",
-        f"viral AI tool launch {today}",
-        f"trending people search talent demand {today}",
+        f"major tech layoffs {today}",
+        f"AI startup funding raised {today}",
+        f"new AI tool product launch this week",
+        f"tech company hiring surge remote jobs {today}",
     ]
 
     for query in queries:
@@ -155,8 +155,18 @@ def scan_trends() -> list[dict]:
             results.append(converted)
             print(f"[trends] ✅ {converted['tweet_hook'][:80]}...")
 
-    print(f"[trends] {len(results)} trends converted to search prompts")
-    return results
+    # Dedup: skip trends with very similar hooks
+    seen_hooks = set()
+    deduped = []
+    for r in results:
+        # Use first 5 words as dedup key
+        key = " ".join(r["tweet_hook"].lower().split()[:5])
+        if key not in seen_hooks:
+            seen_hooks.add(key)
+            deduped.append(r)
+
+    print(f"[trends] {len(deduped)} unique trends (from {len(results)} total)")
+    return deduped
 
 
 if __name__ == "__main__":
