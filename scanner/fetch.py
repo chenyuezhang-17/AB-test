@@ -40,6 +40,7 @@ def scan_tweets() -> list[ScannedTweet]:
                         tweet_id=tweet_id,
                         author=item.get("screen_name", "unknown"),
                         original_text=item.get("text", ""),
+                        author_bio=item.get("user_description", item.get("bio", "")),
                     ))
             except Exception as e:
                 print(f"[scanner] error for '{keyword}': {e}")

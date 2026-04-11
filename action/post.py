@@ -19,11 +19,22 @@ def _get_client() -> tweepy.Client:
     )
 
 def _build_text(reply: PreparedReply) -> str:
+    """Use bridge's personalized reply_text if available, fallback to template."""
     tweet_url = f"https://twitter.com/i/web/status/{reply.tweet_id}"
+
+    # Bridge generates customized reply_text with lessie_url already appended
+    if reply.reply_text and reply.lessie_url in reply.reply_text:
+        return reply.reply_text
+
+    # Fallback: use bridge text + append tweet URL for quote repost
+    if reply.reply_text:
+        return f"{reply.reply_text}\n{tweet_url}"
+
+    # Last resort: generic template
     templates = [
-        f"ran a search on Lessie — pulled a few solid profiles worth checking 👇\n{reply.lessie_url}\n\n{tweet_url}",
-        f"found some matches on Lessie — saved you a few hours of LinkedIn rabbit holes\n{reply.lessie_url}\n\n{tweet_url}",
-        f"built a list on Lessie for this, quality > quantity\n{reply.lessie_url}\n\n{tweet_url}",
+        f"ran a search on Lessie — pulled a few solid profiles worth checking 👇\n{reply.lessie_url}",
+        f"found some matches on Lessie — saved you a few hours of LinkedIn rabbit holes\n{reply.lessie_url}",
+        f"built a list on Lessie for this, quality > quantity\n{reply.lessie_url}",
     ]
     return random.choice(templates)
 
