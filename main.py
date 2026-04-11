@@ -48,11 +48,11 @@ def run_pipeline():
     for tweet in tweets:
         result = analyze_intent(tweet)
         if result:
-            status = "passed" if result.confidence >= 0.7 else "filtered"
+            status = "passed" if result.confidence >= 0.9 else "filtered"
             _log("reasoner", tweet_id=tweet.tweet_id, author=tweet.author,
                  tweet_text=tweet.original_text[:200], intent=result.intent,
                  confidence=result.confidence, status=status)
-            if result.confidence >= 0.7:
+            if result.confidence >= 0.9:
                 analyzed.append(result)
     print(f"[reasoner] {len(analyzed)} tweets passed intent filter")
 

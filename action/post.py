@@ -83,7 +83,7 @@ def _wait_human_interval():
 
 def post_reply(reply: PreparedReply) -> bool:
     """Post a quote repost reply to the original tweet."""
-    if reply.confidence < 0.7:
+    if reply.confidence < 0.9:
         print(f"[action] skipping tweet {reply.tweet_id} (confidence {reply.confidence:.2f})")
         return False
 
