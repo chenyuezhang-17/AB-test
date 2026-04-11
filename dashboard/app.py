@@ -212,6 +212,8 @@ HTML = """<!DOCTYPE html>
     /* Main content */
     .main {
       padding: 36px 44px;
+      min-width: 0;
+      overflow: hidden;
     }
     .main-header {
       margin-bottom: 32px;
