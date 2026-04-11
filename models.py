@@ -9,6 +9,8 @@ class ScannedTweet:
     tweet_id: str
     author: str
     original_text: str
+    author_bio: str = ""
+    recent_tweets: list[str] | None = None  # last 10-20 tweets for context
 
 
 @dataclass

@@ -55,18 +55,26 @@ def _call_lessie(search_data: dict) -> dict | None:
     if not lessie_filter:
         lessie_filter["person_titles"] = ["professional"]
 
+    # Platform field must be a single platform, not comma-separated
+    if "platform" in lessie_filter and "," in str(lessie_filter["platform"]):
+        lessie_filter["platform"] = lessie_filter["platform"].split(",")[0].strip()
+
+    # Limit content_topics to 3 to keep filter clean
+    if "content_topics" in lessie_filter:
+        lessie_filter["content_topics"] = lessie_filter["content_topics"][:3]
+
     cmd = [
         "lessie", "find-people",
         "--filter", json.dumps(lessie_filter),
-        "--checkpoint", checkpoint,
-        "--strategy", "saas_only",
+        "--checkpoint", checkpoint[:300],
+        "--strategy", "hybrid" if mode == "kol" else "saas_only",
         "--target-count", "10",
     ]
     if extra:
-        cmd.extend(["--extra", extra])
+        cmd.extend(["--extra", extra[:150]])
 
     try:
-        result = subprocess.run(cmd, capture_output=True, text=True, timeout=120)
+        result = subprocess.run(cmd, capture_output=True, text=True, timeout=180)
         if result.returncode != 0:
             print(f"[bridge] Lessie error: {result.stderr[:200]}")
             return None
