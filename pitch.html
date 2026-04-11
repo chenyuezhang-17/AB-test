@@ -1,0 +1,747 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Leego — Twitter Digital Employee · Lessie AI</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Caveat:wght@400;500;600;700&family=Noto+Sans+SC:wght@400;500;700&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --paper: #f4f2e9;
+      --paper2: #edeadb;
+      --ink: #1a1a1a;
+      --ink-light: #444;
+      --ink-muted: #888;
+      --blue: #2563eb;
+      --blue-light: rgba(37,99,235,0.1);
+      --blue-mid: rgba(37,99,235,0.2);
+      --red: #dc2626;
+      --green: #16a34a;
+      --yellow: #ca8a04;
+    }
+
+    html { scroll-behavior: smooth; }
+
+    body {
+      /* Caveat for Latin/numbers, Noto Sans SC for Chinese */
+      font-family: 'Caveat', 'Noto Sans SC', sans-serif;
+      background: var(--paper);
+      color: var(--ink);
+      line-height: 1.5;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='300'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.75' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='300' height='300' filter='url(%23n)' opacity='0.04'/%3E%3C/svg%3E");
+    }
+
+    /* ── HAND-DRAWN BORDER HELPERS ── */
+    .border-sketch {
+      border: 2.5px solid var(--ink);
+      border-radius: 255px 15px 225px 15px / 15px 225px 15px 255px;
+      position: relative;
+    }
+    .border-sketch::after {
+      content: '';
+      position: absolute;
+      inset: 3px;
+      border: 1.5px solid rgba(26,26,26,0.15);
+      border-radius: 240px 20px 210px 20px / 20px 210px 20px 240px;
+      pointer-events: none;
+    }
+
+    .border-sketch-sm {
+      border: 2px solid var(--ink);
+      border-radius: 120px 8px 110px 8px / 8px 110px 8px 120px;
+      position: relative;
+    }
+    .border-sketch-sm::after {
+      content: '';
+      position: absolute;
+      inset: 3px;
+      border: 1px solid rgba(26,26,26,0.12);
+      border-radius: 100px 12px 90px 12px / 12px 90px 12px 100px;
+      pointer-events: none;
+    }
+
+    /* diagonal scribble fill */
+    .scribble-bg {
+      background-image: repeating-linear-gradient(
+        60deg, transparent, transparent 6px,
+        rgba(26,26,26,0.04) 6px, rgba(26,26,26,0.04) 7px
+      );
+    }
+    .scribble-blue {
+      background-image: repeating-linear-gradient(
+        60deg, transparent, transparent 6px,
+        rgba(37,99,235,0.07) 6px, rgba(37,99,235,0.07) 7px
+      );
+    }
+
+    /* wavy divider */
+    .wavy {
+      width: 100%; height: 20px; background: none; border: none;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1200 20'%3E%3Cpath d='M0,10 C100,0 200,20 300,10 C400,0 500,20 600,10 C700,0 800,20 900,10 C1000,0 1100,20 1200,10' stroke='%231a1a1a' stroke-width='2' fill='none' opacity='0.25'/%3E%3C/svg%3E");
+      background-size: 400px 20px; background-repeat: repeat-x; margin: 0;
+    }
+
+    /* ── NAV ── */
+    nav {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 20px 48px;
+      border-bottom: 2px solid var(--ink);
+      position: sticky; top: 0; z-index: 100;
+      background: var(--paper);
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='300'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.75' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='300' height='300' filter='url(%23n)' opacity='0.04'/%3E%3C/svg%3E");
+    }
+    .nav-logo {
+      font-family: 'Caveat', 'Noto Sans SC', sans-serif;
+      font-size: 1.8rem; font-weight: 700; color: var(--ink);
+    }
+    .nav-logo span { color: var(--blue); }
+    .nav-links { display: flex; gap: 32px; list-style: none; }
+    .nav-links a {
+      font-family: 'Caveat', 'Noto Sans SC', sans-serif;
+      font-size: 1.1rem; font-weight: 500; color: var(--ink-light);
+      text-decoration: none; transition: color .2s, transform .2s;
+      display: inline-block;
+    }
+    .nav-links a:hover { color: var(--blue); transform: rotate(-1deg) scale(1.05); }
+    .nav-badge {
+      font-family: 'Caveat', 'Noto Sans SC', sans-serif;
+      background: var(--blue); color: #fff;
+      font-size: 0.9rem; font-weight: 600;
+      padding: 6px 16px;
+      border-radius: 100px 4px 100px 4px / 4px 100px 4px 100px;
+      border: 2px solid var(--ink);
+    }
+
+    /* ── HERO ── */
+    .hero {
+      padding: 80px 48px 60px;
+      display: grid; grid-template-columns: 1fr 1fr;
+      gap: 64px; align-items: center;
+      max-width: 1200px; margin: 0 auto;
+    }
+    .hero-tag {
+      display: inline-flex; align-items: center; gap: 8px;
+      font-family: 'Caveat', 'Noto Sans SC', sans-serif;
+      font-size: 1rem; font-weight: 600; color: var(--blue);
+      margin-bottom: 20px;
+      border-bottom: 2px solid var(--blue); padding-bottom: 2px;
+    }
+    h1 {
+      font-family: 'Caveat', 'Noto Sans SC', sans-serif;
+      font-size: clamp(3rem, 6vw, 5.5rem);
+      font-weight: 700; line-height: 1.05;
+      letter-spacing: -0.02em; color: var(--ink); margin-bottom: 24px;
+    }
+    h1 .underline-blue {
+      position: relative; display: inline-block;
+    }
+    h1 .underline-blue::after {
+      content: '';
+      position: absolute; bottom: -4px; left: 0; right: 0;
+      height: 6px; background: var(--blue); border-radius: 2px; opacity: 0.3;
+    }
+    .hero-desc {
+      font-family: 'Noto Sans SC', sans-serif;
+      font-size: 1.05rem; font-weight: 400; color: var(--ink-light);
+      line-height: 1.75; margin-bottom: 36px; max-width: 480px;
+    }
+    .hero-actions { display: flex; gap: 16px; flex-wrap: wrap; }
+    .btn-ink {
+      display: inline-flex; align-items: center; gap: 8px;
+      background: var(--ink); color: var(--paper);
+      font-family: 'Caveat', 'Noto Sans SC', sans-serif;
+      font-size: 1.15rem; font-weight: 600;
+      padding: 12px 28px; border: 2px solid var(--ink);
+      border-radius: 120px 6px 110px 6px / 6px 110px 6px 120px;
+      cursor: pointer; text-decoration: none; transition: transform .2s, background .2s;
+    }
+    .btn-ink:hover { transform: rotate(-1deg) scale(1.03); background: var(--blue); border-color: var(--blue); }
+    .btn-outline {
+      display: inline-flex; align-items: center; gap: 8px;
+      background: transparent; color: var(--ink);
+      font-family: 'Caveat', 'Noto Sans SC', sans-serif;
+      font-size: 1.15rem; font-weight: 600;
+      padding: 12px 28px; border: 2px solid var(--ink);
+      border-radius: 6px 120px 6px 110px / 110px 6px 120px 6px;
+      cursor: pointer; text-decoration: none; transition: transform .2s, background .2s;
+    }
+    .btn-outline:hover { transform: rotate(1deg) scale(1.03); background: var(--blue-light); }
+
+    /* hero visual */
+    .hero-visual { position: relative; }
+    .hero-card-main { padding: 32px; background: #fff; }
+    .tweet-row { display: flex; align-items: flex-start; gap: 12px; margin-bottom: 20px; }
+    .avatar {
+      width: 42px; height: 42px; border-radius: 50%; border: 2px solid var(--ink);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 1.1rem; font-weight: 700; flex-shrink: 0;
+    }
+    .avatar.user-a { background: #dbeafe; color: var(--blue); }
+    .avatar.leego  { background: var(--ink); color: var(--paper); }
+    .tweet-body { flex: 1; }
+    .tweet-name {
+      font-family: 'Caveat', 'Noto Sans SC', sans-serif;
+      font-size: 1rem; font-weight: 700;
+    }
+    .tweet-handle {
+      font-family: 'Caveat', sans-serif;
+      font-size: 0.88rem; color: var(--ink-muted); margin-bottom: 6px;
+    }
+    .tweet-text {
+      font-family: 'Noto Sans SC', sans-serif;
+      font-size: 0.88rem; line-height: 1.55; color: var(--ink-light);
+    }
+    .leego-reply {
+      margin-left: 54px; padding: 16px 20px;
+      background: var(--blue-light); border-left: 3px solid var(--blue);
+      border-radius: 0 8px 8px 0; position: relative;
+    }
+    .reply-header { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+    .leego-tag {
+      background: var(--blue); color: #fff;
+      font-family: 'Caveat', sans-serif;
+      font-size: 0.82rem; font-weight: 700;
+      padding: 2px 8px; border-radius: 4px; letter-spacing: .05em;
+    }
+    .speed-tag {
+      font-family: 'Noto Sans SC', sans-serif;
+      font-size: 0.78rem; color: var(--green); font-weight: 600;
+    }
+    .link-blue { color: var(--blue); text-decoration: underline; font-weight: 600; }
+    .timer-badge {
+      display: inline-flex; align-items: center; gap: 4px;
+      background: rgba(22,163,74,0.08); border: 1px solid rgba(22,163,74,0.2);
+      border-radius: 100px; padding: 4px 10px;
+      font-family: 'Noto Sans SC', sans-serif;
+      font-size: 0.72rem; color: var(--green); font-weight: 500; margin-top: 8px;
+    }
+
+    /* floating sticker */
+    .sticker {
+      position: absolute;
+      font-family: 'Caveat', 'Noto Sans SC', sans-serif;
+      background: var(--blue); color: #fff;
+      font-size: 1rem; font-weight: 700;
+      padding: 8px 16px;
+      border-radius: 4px 80px 4px 80px / 80px 4px 80px 4px;
+      border: 2px solid var(--ink); white-space: nowrap;
+      animation: wobble 3s ease-in-out infinite;
+    }
+    @keyframes wobble { 0%,100%{transform:rotate(-3deg)} 50%{transform:rotate(2deg)} }
+    .sticker-1 { top: -20px; right: 20px; }
+    .sticker-2 { bottom: -16px; left: -10px; background: var(--paper); color: var(--ink); border-color: var(--ink); animation-delay: 1s; }
+
+    /* ── STATS ── */
+    .stats-row {
+      max-width: 1200px; margin: 0 auto;
+      padding: 40px 48px;
+      display: grid; grid-template-columns: repeat(4, 1fr); gap: 24px;
+    }
+    .stat-box { text-align: center; padding: 28px 20px; background: #fff; }
+    .stat-n {
+      font-family: 'Caveat', sans-serif;
+      font-size: 3.2rem; font-weight: 700; color: var(--blue);
+      line-height: 1; margin-bottom: 6px;
+    }
+    .stat-l {
+      font-family: 'Noto Sans SC', sans-serif;
+      font-size: 0.82rem; font-weight: 500; color: var(--ink-muted);
+    }
+
+    /* ── SECTIONS ── */
+    .section { padding: 80px 48px; max-width: 1200px; margin: 0 auto; }
+    .section-full {
+      padding: 80px 48px;
+      background: var(--paper2);
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='300'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.75' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='300' height='300' filter='url(%23n)' opacity='0.05'/%3E%3C/svg%3E");
+    }
+    .section-full .inner { max-width: 1200px; margin: 0 auto; }
+
+    .section-eyebrow {
+      font-family: 'Caveat', sans-serif;
+      font-size: 1.05rem; font-weight: 600; color: var(--blue);
+      letter-spacing: .08em; text-transform: uppercase; margin-bottom: 12px;
+    }
+    h2 {
+      font-family: 'Caveat', 'Noto Sans SC', sans-serif;
+      font-size: clamp(2.2rem, 4vw, 3.6rem);
+      font-weight: 700; line-height: 1.1; letter-spacing: -0.02em;
+      margin-bottom: 16px;
+    }
+    .section-lead {
+      font-family: 'Noto Sans SC', sans-serif;
+      font-size: 1rem; color: var(--ink-light);
+      max-width: 560px; line-height: 1.75; margin-bottom: 48px;
+    }
+
+    /* ── PROBLEM ── */
+    .problem-grid { display: grid; grid-template-columns: repeat(3,1fr); gap: 24px; }
+    .p-card { padding: 32px; background: #fff; transition: transform .25s; }
+    .p-card:hover { transform: rotate(-0.5deg) scale(1.01); }
+    .p-card .icon { font-size: 2.4rem; margin-bottom: 14px; }
+    .p-card h3 {
+      font-family: 'Caveat', 'Noto Sans SC', sans-serif;
+      font-size: 1.4rem; font-weight: 700; margin-bottom: 10px;
+    }
+    .p-card p {
+      font-family: 'Noto Sans SC', sans-serif;
+      font-size: 0.9rem; color: var(--ink-light); line-height: 1.7;
+    }
+
+    /* ── PIPELINE ── */
+    .pipeline-row {
+      display: grid; grid-template-columns: repeat(4,1fr);
+      gap: 20px; margin-top: 48px; position: relative;
+    }
+    .pipe-step { text-align: center; position: relative; }
+    .pipe-step:not(:last-child)::after {
+      content: '→'; position: absolute;
+      top: 44px; right: -14px;
+      font-size: 1.6rem; font-weight: 700; color: var(--ink-muted); z-index: 1;
+    }
+    .pipe-icon-wrap {
+      width: 88px; height: 88px; margin: 0 auto 20px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 2.4rem; background: #fff; transition: transform .2s;
+    }
+    .pipe-step:hover .pipe-icon-wrap { transform: scale(1.08) rotate(-2deg); }
+    .pipe-layer {
+      font-family: 'Caveat', sans-serif;
+      font-size: 0.82rem; font-weight: 700; text-transform: uppercase;
+      letter-spacing: .1em; color: var(--ink-muted); margin-bottom: 6px;
+    }
+    .pipe-name {
+      font-family: 'Caveat', 'Noto Sans SC', sans-serif;
+      font-size: 1.5rem; font-weight: 700; margin-bottom: 8px;
+    }
+    .pipe-desc {
+      font-family: 'Noto Sans SC', sans-serif;
+      font-size: 0.85rem; color: var(--ink-light); line-height: 1.6;
+    }
+    .pipe-tech {
+      display: inline-block; margin-top: 10px;
+      font-family: 'Caveat', sans-serif;
+      font-size: 0.85rem; font-weight: 600; color: var(--blue);
+      background: var(--blue-light); padding: 3px 10px;
+      border-radius: 100px; border: 1.5px solid var(--blue-mid);
+    }
+
+    /* ── SCENARIOS ── */
+    .scenarios-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 28px; }
+    .sc-card { padding: 40px; background: #fff; transition: transform .25s; }
+    .sc-card:hover { transform: rotate(0.3deg) scale(1.01); }
+    .sc-label {
+      font-family: 'Caveat', sans-serif;
+      font-size: 0.88rem; font-weight: 700; text-transform: uppercase;
+      letter-spacing: .1em; margin-bottom: 12px;
+    }
+    .sc-label.a { color: var(--blue); }
+    .sc-label.b { color: #ea580c; }
+    .sc-card h3 {
+      font-family: 'Caveat', 'Noto Sans SC', sans-serif;
+      font-size: 1.7rem; font-weight: 700; margin-bottom: 14px;
+    }
+    .sc-card p {
+      font-family: 'Noto Sans SC', sans-serif;
+      font-size: 0.9rem; color: var(--ink-light); line-height: 1.7; margin-bottom: 20px;
+    }
+    .sc-list { list-style: none; display: flex; flex-direction: column; gap: 8px; }
+    .sc-list li {
+      display: flex; align-items: flex-start; gap: 10px;
+      font-family: 'Noto Sans SC', sans-serif;
+      font-size: 0.9rem; color: var(--ink-light);
+    }
+    .sc-list li::before { content: '✓'; font-weight: 700; flex-shrink: 0; margin-top: 1px; }
+    .sc-card.a .sc-list li::before { color: var(--blue); }
+    .sc-card.b .sc-list li::before { color: #ea580c; }
+
+    /* ── BENTO METRICS ── */
+    .bento {
+      display: grid; grid-template-columns: 1fr 1fr;
+      gap: 20px; margin-top: 48px;
+    }
+    .bento-card {
+      padding: 32px; background: #fff; transition: transform .25s;
+      display: flex; align-items: flex-start; gap: 24px;
+    }
+    .bento-card:hover { transform: rotate(-0.5deg) scale(1.01); }
+    .bento-card.full { grid-column: span 2; }
+    .bento-big {
+      font-family: 'Caveat', sans-serif;
+      font-size: 3.6rem; font-weight: 700; line-height: 1;
+      flex-shrink: 0; min-width: 80px; text-align: center;
+    }
+    .bento-card:nth-child(1) .bento-big { color: var(--blue); }
+    .bento-card:nth-child(2) .bento-big { color: #7c3aed; }
+    .bento-card:nth-child(3) .bento-big { color: var(--green); }
+    .bento-card:nth-child(4) .bento-big { color: var(--blue); }
+    .bento-text { flex: 1; }
+    .bento-title {
+      font-family: 'Caveat', 'Noto Sans SC', sans-serif;
+      font-size: 1.25rem; font-weight: 700; margin-bottom: 6px;
+    }
+    .bento-desc {
+      font-family: 'Noto Sans SC', sans-serif;
+      font-size: 0.88rem; color: var(--ink-light); line-height: 1.65;
+    }
+
+    /* ── AUDIENCE ── */
+    .audience-grid { display: grid; grid-template-columns: repeat(3,1fr); gap: 24px; }
+    .aud-card { padding: 32px; background: #fff; transition: transform .25s; }
+    .aud-card:hover { transform: rotate(0.5deg) scale(1.01); }
+    .aud-card .icon { font-size: 2.2rem; margin-bottom: 14px; }
+    .aud-card h3 {
+      font-family: 'Caveat', 'Noto Sans SC', sans-serif;
+      font-size: 1.3rem; font-weight: 700; margin-bottom: 8px;
+    }
+    .aud-card p {
+      font-family: 'Noto Sans SC', sans-serif;
+      font-size: 0.88rem; color: var(--ink-light); line-height: 1.65;
+    }
+
+    /* ── CTA ── */
+    .cta-wrap {
+      text-align: center; padding: 80px 48px 100px;
+      max-width: 800px; margin: 0 auto;
+    }
+    .cta-wrap h2 { margin-bottom: 20px; }
+    .cta-wrap p {
+      font-family: 'Noto Sans SC', sans-serif;
+      font-size: 1rem; color: var(--ink-light); margin-bottom: 40px; line-height: 1.75;
+    }
+    .cta-actions { display: flex; gap: 16px; justify-content: center; flex-wrap: wrap; }
+    .annotation {
+      display: inline-flex; align-items: center; gap: 6px;
+      font-family: 'Caveat', 'Noto Sans SC', sans-serif;
+      font-size: 1.05rem; font-weight: 600; color: var(--blue);
+      transform: rotate(-2deg); margin-top: 16px;
+    }
+
+    /* ── FOOTER ── */
+    footer {
+      border-top: 2px solid var(--ink); padding: 28px 48px;
+      display: flex; align-items: center; justify-content: space-between;
+      background: var(--paper2);
+    }
+    .footer-logo {
+      font-family: 'Caveat', 'Noto Sans SC', sans-serif;
+      font-size: 1.4rem; font-weight: 700;
+    }
+    .footer-logo span { color: var(--blue); }
+    .footer-r {
+      font-family: 'Noto Sans SC', sans-serif;
+      font-size: 0.82rem; color: var(--ink-muted);
+    }
+
+    /* ── FADE IN ── */
+    .fade-up { opacity: 0; transform: translateY(20px); transition: opacity .6s ease, transform .6s ease; }
+    .fade-up.show { opacity: 1; transform: none; }
+
+    /* ── RESPONSIVE ── */
+    @media (max-width: 900px) {
+      nav { padding: 16px 20px; }
+      .nav-links { display: none; }
+      .hero { grid-template-columns: 1fr; padding: 48px 20px; gap: 40px; }
+      .stats-row { grid-template-columns: 1fr 1fr; padding: 32px 20px; }
+      .section, .section-full { padding: 60px 20px; }
+      .problem-grid, .scenarios-grid, .audience-grid, .bento { grid-template-columns: 1fr; }
+      .pipeline-row { grid-template-columns: 1fr 1fr; }
+      .bento-card:nth-child(1) { grid-column: span 1; }
+      .pipe-step::after { display: none; }
+      footer { padding: 24px 20px; flex-direction: column; gap: 12px; text-align: center; }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- ── NAV ── -->
+  <nav>
+    <div class="nav-logo"><span>Leego</span> · by Lessie AI</div>
+    <ul class="nav-links">
+      <li><a href="#how">How it works</a></li>
+      <li><a href="#scenarios">Scenarios</a></li>
+      <li><a href="#metrics">Why it works</a></li>
+    </ul>
+    <div class="nav-badge">🏆 Hackathon 2026</div>
+  </nav>
+
+  <!-- ── HERO ── -->
+  <div class="section" style="padding-bottom: 0;">
+    <div class="hero" style="padding: 60px 0 80px; max-width: 100%;">
+      <div>
+        <div class="hero-tag">🤖 AI Digital Employee</div>
+        <h1>你的推特<br/><span class="underline-blue">增长员工</span><br/>永不下线</h1>
+        <p class="hero-desc">当有人喊"推荐个 AI 工程师"，Leego 已经把候选人列表发过去了——你还在睡觉。</p>
+        <div class="hero-actions">
+          <a href="#how" class="btn-ink">看它怎么跑 →</a>
+          <a href="https://app.lessie.ai" class="btn-outline" target="_blank">试试 Lessie AI ↗</a>
+        </div>
+        <div class="annotation" style="display:flex;margin-top:20px;">
+          <span style="font-size:1.4rem;">↑</span>
+          全程零人工介入，30 秒响应
+        </div>
+      </div>
+      <div class="hero-visual">
+        <div class="border-sketch" style="background:#fff; padding: 32px; position:relative;">
+          <div class="sticker sticker-1">⚡ 23 秒</div>
+          <div class="tweet-row">
+            <div class="avatar user-a">J</div>
+            <div class="tweet-body">
+              <div class="tweet-name">Jason <span style="font-weight:400;color:var(--ink-muted)">@jasond</span></div>
+              <div class="tweet-handle">2 分钟前</div>
+              <div class="tweet-text">Anyone can recommend a solid AI engineer in SF? Looking to hire ASAP 🙏</div>
+            </div>
+          </div>
+          <div class="leego-reply">
+            <div class="reply-header">
+              <span class="leego-tag">LEEGO</span>
+              <span class="speed-tag">✓ 23 秒内自动回复</span>
+            </div>
+            <div class="tweet-text">
+              Hey Jason！给你找了几位 SF 的 AI 工程师 👇<br/><br/>
+              → <span class="link-blue">lessie.ai/s/ai-eng-sf</span><br/><br/>
+              有更具体的要求随时说，我再搜！
+            </div>
+          </div>
+          <div class="sticker sticker-2">🤖 Leego · Lessie</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="wavy"></div>
+
+  <!-- ── STATS ── -->
+  <div class="stats-row">
+    <div class="stat-box border-sketch-sm scribble-blue fade-up">
+      <div class="stat-n">&lt;30s</div>
+      <div class="stat-l">从推文到回复</div>
+    </div>
+    <div class="stat-box border-sketch-sm fade-up">
+      <div class="stat-n">0</div>
+      <div class="stat-l">人工干预</div>
+    </div>
+    <div class="stat-box border-sketch-sm fade-up">
+      <div class="stat-n">24/7</div>
+      <div class="stat-l">全天候监听</div>
+    </div>
+    <div class="stat-box border-sketch-sm scribble-blue fade-up">
+      <div class="stat-n">∞</div>
+      <div class="stat-l">可扩展并发</div>
+    </div>
+  </div>
+
+  <div class="wavy"></div>
+
+  <!-- ── PROBLEM ── -->
+  <div class="section">
+    <div class="section-eyebrow">The Problem</div>
+    <h2>每天数千条找人信号<br/>在推特悄悄消失</h2>
+    <p class="section-lead">高意图用户主动发推求推荐，却没人接。传统广告没有意图定向——Leego 直接去鱼塘钓鱼。</p>
+    <div class="problem-grid">
+      <div class="p-card border-sketch fade-up">
+        <div class="icon">🔍</div>
+        <h3>高意图信号被浪费</h3>
+        <p>"寻找开发者"、"推荐设计师"——这些推文没人接，5 分钟后消失在时间线。</p>
+      </div>
+      <div class="p-card border-sketch fade-up">
+        <div class="icon">⏰</div>
+        <h3>黄金回复窗口极短</h3>
+        <p>第一个有价值的回复胜出。人工运营根本跟不上社交媒体的实时节奏。</p>
+      </div>
+      <div class="p-card border-sketch fade-up">
+        <div class="icon">💸</div>
+        <h3>获客成本高、意图低</h3>
+        <p>广告是撒网，Leego 是钓鱼。只在用户主动发出需求的瞬间精准出击。</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="wavy"></div>
+
+  <!-- ── PIPELINE ── -->
+  <div class="section-full" id="how">
+    <div class="inner">
+      <div class="section-eyebrow" style="text-align:center;">How It Works</div>
+      <h2 style="text-align:center;">四层 Pipeline，全自动闭环</h2>
+      <p class="section-lead" style="margin:0 auto 0; text-align:center;">从一条推文到候选人列表，全程无需人工介入。</p>
+      <div class="pipeline-row">
+        <div class="pipe-step fade-up">
+          <div class="pipe-icon-wrap border-sketch">📡</div>
+          <div class="pipe-layer">Layer 01</div>
+          <div class="pipe-name">Scanner</div>
+          <div class="pipe-desc">实时监听 Twitter，过滤包含招聘意图关键词的推文流。</div>
+          <div class="pipe-tech">Twitter API · TikHub</div>
+        </div>
+        <div class="pipe-step fade-up">
+          <div class="pipe-icon-wrap border-sketch">🧠</div>
+          <div class="pipe-layer">Layer 02</div>
+          <div class="pipe-name">Reasoner</div>
+          <div class="pipe-desc">LLM 分析推文意图，提取职位类型、地点、技能等参数。</div>
+          <div class="pipe-tech">Claude · Intent AI</div>
+        </div>
+        <div class="pipe-step fade-up">
+          <div class="pipe-icon-wrap border-sketch">🌉</div>
+          <div class="pipe-layer">Layer 03</div>
+          <div class="pipe-name">Bridge</div>
+          <div class="pipe-desc">调用 Lessie API 搜索人才，生成动态分享链接和回复内容。</div>
+          <div class="pipe-tech">Lessie API · Link Gen</div>
+        </div>
+        <div class="pipe-step fade-up">
+          <div class="pipe-icon-wrap border-sketch">🚀</div>
+          <div class="pipe-layer">Layer 04</div>
+          <div class="pipe-name">Action</div>
+          <div class="pipe-desc">以引用回复形式发推，对话式语言，真实自然不像机器人。</div>
+          <div class="pipe-tech">Tweepy · Quote RT</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="wavy"></div>
+
+  <!-- ── SCENARIOS ── -->
+  <div class="section" id="scenarios">
+    <div class="section-eyebrow">Use Cases</div>
+    <h2>两种增长模式，同时跑</h2>
+    <p class="section-lead">主动抢热点 + 被动截意图，双管齐下覆盖全场景。</p>
+    <div class="scenarios-grid">
+      <div class="sc-card a border-sketch fade-up">
+        <div class="sc-label a">Scenario A · 主动出击</div>
+        <h3>热点趋势自动发帖</h3>
+        <p>抓取当下推特热点与人物相关事件，发散思考如何融入"搜人"角度，借势热点主动发帖，让 Lessie 出现在最高流量的对话里。</p>
+        <ul class="sc-list">
+          <li>监听实时热榜，识别与人相关的热点事件</li>
+          <li>LLM 发散：这个热点能怎么和"找人"挂钩？</li>
+          <li>自动生成借势推文 + Lessie 搜索链接</li>
+          <li>蹭热点流量，把找人需求种进大众视野</li>
+        </ul>
+      </div>
+      <div class="sc-card b border-sketch fade-up" style="border-radius: 15px 225px 15px 225px / 225px 15px 225px 15px;">
+        <div class="sc-label b">Scenario B · 被动截流</div>
+        <h3>意图识别引用回复</h3>
+        <p>监听推特上隐含找人需求的信号——不只是明确求职，更多是抱怨、吐槽、隐性需求等，识别出真实意图后自动介入回复。</p>
+        <ul class="sc-list">
+          <li>识别抱怨型信号：「又找不到合适的人」「团队缺个懂 XX 的」</li>
+          <li>识别需求型信号：「有没有推荐」「谁认识做 XX 的」</li>
+          <li>LLM 判断意图强度，过滤无关噪声</li>
+          <li>30 秒内精准介入，送上 Lessie 搜索结果</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <div class="wavy"></div>
+
+  <!-- ── AUDIENCE ── -->
+  <div class="section-full">
+    <div class="inner">
+      <div class="section-eyebrow">Target Users</div>
+      <h2>谁会用到 Leego？</h2>
+      <p class="section-lead">高意图买家就在推特，Leego 帮 Lessie 把他们截下来。</p>
+      <div class="audience-grid" style="grid-template-columns: repeat(2, 1fr);">
+        <div class="aud-card border-sketch-sm fade-up">
+          <div class="icon">📈</div>
+          <h3>B2B 增长运营</h3>
+          <p>寻找高意图线索的销售和增长团队，在正确对话出现 Lessie。</p>
+        </div>
+        <div class="aud-card border-sketch-sm fade-up">
+          <div class="icon">🧑‍💻</div>
+          <h3>独立开发者 & 初创</h3>
+          <p>预算有限、急需人才的小团队，Leego 提供零广告费精准触达。</p>
+        </div>
+        <div class="aud-card border-sketch-sm fade-up">
+          <div class="icon">🎯</div>
+          <h3>AI / Web3 猎头</h3>
+          <p>在热门赛道寻找候选人的招聘方，Leego 在他们发推那刻就出现。</p>
+        </div>
+        <div class="aud-card border-sketch-sm fade-up">
+          <div class="icon">🙋</div>
+          <h3>想自我推销的人</h3>
+          <p>从「等着被发现」变成「主动出击」——借助 Leego 找到正在发推的猎头和招聘方，把自己精准送到他们面前。</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="wavy"></div>
+
+  <!-- ── METRICS ── -->
+  <div class="section" id="metrics">
+    <div class="section-eyebrow">Why It Works</div>
+    <h2>先提供价值，再建立认知</h2>
+    <p class="section-lead">不靠广告，靠价值。每一次回复都是 Lessie 的活广告。</p>
+    <div class="bento">
+      <div class="bento-card border-sketch scribble-blue fade-up">
+        <div class="bento-big">零</div>
+        <div class="bento-text">
+          <div class="bento-title">运营开销</div>
+          <div class="bento-desc">全自动 Pipeline，7×24 持续工作，不请假，不摸鱼。</div>
+        </div>
+      </div>
+      <div class="bento-card border-sketch fade-up">
+        <div class="bento-big">高</div>
+        <div class="bento-text">
+          <div class="bento-title">转化意图</div>
+          <div class="bento-desc">只响应主动发出需求的用户，在正确时机出现。</div>
+        </div>
+      </div>
+      <div class="bento-card border-sketch fade-up">
+        <div class="bento-big">极简</div>
+        <div class="bento-text">
+          <div class="bento-title">用户摩擦</div>
+          <div class="bento-desc">点击链接即用，无需注册，无摩擦转化。</div>
+        </div>
+      </div>
+      <div class="bento-card border-sketch fade-up">
+        <div class="bento-big">30s</div>
+        <div class="bento-text">
+          <div class="bento-title">Demo 响应时间</div>
+          <div class="bento-desc">Scanner → Reasoner → Bridge → Action 完整链路闭环，全程自动，人类只需要发那条推文。</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="wavy"></div>
+
+  <!-- ── CTA ── -->
+  <div class="cta-wrap">
+    <div class="section-eyebrow" style="text-align:center;">Demo Time</div>
+    <h2>现在去发条推文<br/>等着 Leego 回你</h2>
+    <p>发一条 "looking for an AI engineer in SF"——30 秒内 Leego 会带着候选人列表出现在你的通知里。</p>
+    <div class="cta-actions">
+      <a href="https://app.lessie.ai" class="btn-ink" target="_blank">🔍 访问 Lessie AI</a>
+      <a href="#how" class="btn-outline">了解 Pipeline 架构</a>
+    </div>
+    <div class="annotation" style="justify-content:center;margin-top:24px;">
+      <span style="font-size:1.4rem;">↑</span>
+      Built with Claude + Tweepy + Lessie API
+    </div>
+  </div>
+
+  <!-- ── FOOTER ── -->
+  <footer>
+    <div class="footer-logo"><span>Leego</span> · Lessie AI</div>
+    <div class="footer-r">Hackathon 2026 · @alliiexia</div>
+  </footer>
+
+  <script>
+    const io = new IntersectionObserver(entries => {
+      entries.forEach(e => {
+        if (e.isIntersecting) {
+          const siblings = [...(e.target.parentElement?.querySelectorAll('.fade-up') || [])];
+          const i = siblings.indexOf(e.target);
+          setTimeout(() => e.target.classList.add('show'), i * 80);
+          io.unobserve(e.target);
+        }
+      });
+    }, { threshold: 0.12 });
+    document.querySelectorAll('.fade-up').forEach(el => io.observe(el));
+  </script>
+</body>
+</html>
