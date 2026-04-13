@@ -119,15 +119,13 @@ def post_tweet_browser(text: str) -> tuple[bool, str]:
 
 
 def _get_latest_reply_url(original_tweet_url: str) -> str | None:
-    """Navigate to original tweet and find our most recent reply."""
+    """Find our most recent reply by checking our Tweets & Replies tab."""
     try:
-        bw("goto", original_tweet_url, timeout=15)
-        time.sleep(3)
+        bw("goto", "https://x.com/alliiexia/with_replies", timeout=15)
+        time.sleep(4)
         result = bw("eval", """(function(){
             const articles = document.querySelectorAll('article[data-testid="tweet"]');
             for (const a of articles) {
-                const userEl = a.querySelector('[data-testid="User-Name"]');
-                if (!userEl || !userEl.innerText.includes('alliiexia')) continue;
                 const links = a.querySelectorAll('a[href*="/status/"]');
                 for (const l of links) {
                     const m = l.href.match(/alliiexia\\/status\\/(\\d+)/);
@@ -162,47 +160,81 @@ def _get_latest_tweet_url() -> str | None:
         return None
 
 
-def post_reply_browser(tweet_url: str, text: str) -> tuple[bool, str]:
-    """Post a reply to a specific tweet via browser. Returns (success, url_or_error)."""
+def post_quote_browser(tweet_url: str, text: str) -> tuple[bool, str]:
+    """Quote-repost a tweet via browser. Returns (success, url_or_error)."""
     if not ensure_session():
         return False, "browser session failed to start"
 
     bw("goto", tweet_url, timeout=20)
     time.sleep(3)
 
-    # Wait for reply textbox
+    # Click the Retweet button to open retweet menu
+    rt_click = bw("eval", """(function(){
+        const btns = document.querySelectorAll('[data-testid="retweet"]');
+        if (!btns.length) return 'no retweet btn';
+        btns[0].click(); return 'clicked';
+    })()""")
+    if rt_click.get("value") != "clicked":
+        return False, f"retweet btn failed: {rt_click.get('value')}"
+
+    time.sleep(1.5)
+
+    # Click "Quote" option from the dropdown
+    quote_click = bw("eval", """(function(){
+        const items = document.querySelectorAll('[role="menuitem"]');
+        for (const item of items) {
+            if (item.innerText && item.innerText.toLowerCase().includes('quote')) {
+                item.click(); return 'clicked';
+            }
+        }
+        return 'no quote option';
+    })()""")
+    if quote_click.get("value") != "clicked":
+        return False, f"quote option failed: {quote_click.get('value')}"
+
+    time.sleep(2)
+
+    # Wait for the quote compose box
     for _ in range(10):
         check = bw("eval", "document.querySelector('[data-testid=\"tweetTextarea_0\"][role=\"textbox\"]') ? 'ok' : 'no'")
         if check.get("value") == "ok":
             break
-        time.sleep(2)
+        time.sleep(1)
 
-    # Focus reply box
-    focus = bw("eval", "(function(){const el=document.querySelector('[data-testid=\"tweetTextarea_0\"][role=\"textbox\"]'); if(!el) return 'not found'; el.click(); el.focus(); return document.activeElement===el ? 'ok' : 'focused';})()")
-    if focus.get("value") not in ("ok", "focused"):
-        return False, f"reply focus failed: {focus.get('value')}"
+    # Focus compose box
+    focus = bw("eval", """(function(){
+        const el = document.querySelector('[data-testid="tweetTextarea_0"][role="textbox"]');
+        if (!el) return 'not found';
+        el.click(); el.focus();
+        return 'ok';
+    })()""")
+    if focus.get("value") != "ok":
+        return False, f"quote focus failed: {focus.get('value')}"
 
-    # Type reply text
+    # Type quote text
     result = bw("type", text)
     if not result.get("ok"):
         return False, f"type failed: {result.get('error')}"
 
     time.sleep(1)
 
-    # Click reply button
+    # Click Post button
     click = bw("eval", """(function(){
-        const btn = document.querySelector('[data-testid="tweetButtonInline"]')
-            || document.querySelector('[data-testid="tweetButton"]');
+        const btn = document.querySelector('[data-testid="tweetButton"]')
+            || document.querySelector('[data-testid="tweetButtonInline"]');
         if (!btn) return 'no button';
         if (btn.getAttribute('aria-disabled') === 'true') return 'disabled';
         btn.click(); return 'clicked';
     })()""")
-
     if click.get("value") != "clicked":
-        return False, f"reply click failed: {click.get('value')}"
+        return False, f"post click failed: {click.get('value')}"
 
     time.sleep(3)
 
-    # Grab the URL of the reply we just posted (navigate to replies tab)
-    tweet_link = _get_latest_reply_url(tweet_url)
+    tweet_link = _get_latest_tweet_url()
     return True, tweet_link or "posted"
+
+
+# Keep old name as alias for compatibility
+def post_reply_browser(tweet_url: str, text: str) -> tuple[bool, str]:
+    return post_quote_browser(tweet_url, text)
