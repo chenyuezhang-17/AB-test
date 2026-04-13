@@ -48,7 +48,7 @@ print("=" * 60)
 
 from scanner.trends import scan_trends
 from bridge.search import _create_share_link
-from action.main import post_quote_retweet
+from action.browser_post import post_tweet_browser
 
 trends = scan_trends()
 print(f"[scanner] {len(trends)} trends found")
@@ -62,7 +62,7 @@ for trend in trends:
     tweet_text = f"{trend['tweet_hook']}\n\n{share_url}"
     print(f"[action] posting: {tweet_text[:120]}")
     try:
-        post_quote_retweet(tweet_id="", reply_text=tweet_text, dry_run=False)
+        post_tweet_browser(tweet_text)
         print("[action] ✅ posted")
     except Exception as e:
         print(f"[action] ❌ {e}")

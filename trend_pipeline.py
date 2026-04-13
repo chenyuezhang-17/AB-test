@@ -12,7 +12,7 @@ from dotenv import load_dotenv
 
 from scanner.trends import scan_trends
 from bridge.search import _call_lessie_cli, _create_share_link
-from action.post import _get_client
+from action.browser_post import post_tweet_browser
 
 load_dotenv()
 
@@ -91,9 +91,8 @@ def run_trend_pipeline():
             _log("trend_post", topic=topic[:200], status="dry_run", detail=tweet_text[:500])
         else:
             try:
-                client = _get_client()
-                response = client.create_tweet(text=tweet_text)
-                print(f"[pipeline] posted: https://twitter.com/alliiexia/status/{response.data['id']}")
+                post_tweet_browser(tweet_text)
+                print(f"[pipeline] posted via browser")
                 _log("trend_post", topic=topic[:200], status="posted", detail=tweet_text[:500])
             except Exception as e:
                 print(f"[pipeline] ❌ Post failed: {e}")

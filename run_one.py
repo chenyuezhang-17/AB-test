@@ -18,7 +18,7 @@ from action.post import post_reply
 
 from scanner.trends import scan_trends
 from bridge.search import _create_share_link
-from action.main import post_quote_retweet
+from action.browser_post import post_tweet_browser
 
 DRY_RUN = False  # REAL posting
 
@@ -75,7 +75,7 @@ for trend in trends:
     tweet_text = f"{hook}\n\n{share_url}"
     print(f"[trend] Posting: {tweet_text[:120]}...")
     try:
-        post_quote_retweet(tweet_id="", reply_text=tweet_text, dry_run=DRY_RUN)
+        post_tweet_browser(tweet_text)
         print(f"[action] ✅ Trend tweet posted")
         posted_trend = True
     except Exception as e:
