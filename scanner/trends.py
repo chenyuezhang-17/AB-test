@@ -10,18 +10,38 @@ import subprocess
 from datetime import datetime
 
 
+import os
+import shutil
+
+def _lessie_bin() -> str:
+    path = shutil.which("lessie")
+    if path:
+        return path
+    nvm = os.path.expanduser("~/.nvm/versions/node/v24.14.1/bin/lessie")
+    if os.path.exists(nvm):
+        return nvm
+    return "lessie"
+
+
 def _web_search(query: str) -> list[dict]:
-    """Search via lessie web-search and return results."""
+    """Search via lessie call web_search and return results."""
+    import os
+    env = os.environ.copy()
+    nvm_node = os.path.expanduser("~/.nvm/versions/node/v24.14.1/bin")
+    env["PATH"] = nvm_node + ":" + env.get("PATH", "")
     try:
+        args_json = json.dumps({"query": query, "count": 5})
         result = subprocess.run(
-            ["lessie", "web-search", "--query", query, "--count", "5"],
-            capture_output=True, text=True, timeout=30
+            [_lessie_bin(), "call", "web_search", "--args", args_json],
+            capture_output=True, text=True, timeout=30, env=env
         )
         if result.returncode != 0:
+            print(f"[trends] web_search error: {result.stderr[:200]}")
             return []
         data = json.loads(result.stdout)
         return data.get("results", [])
-    except (subprocess.TimeoutExpired, json.JSONDecodeError):
+    except (subprocess.TimeoutExpired, json.JSONDecodeError) as e:
+        print(f"[trends] web_search failed: {e}")
         return []
 
 
@@ -108,8 +128,9 @@ def convert_trend_to_search(trend: dict) -> dict | None:
     )
 
     try:
+        CLAUDE_BIN = "/Users/lessie/Library/Application Support/Claude/claude-code/2.1.92/claude.app/Contents/MacOS/claude"
         result = subprocess.run(
-            ["claude", "-p", prompt, "--system-prompt", CONVERT_PROMPT,
+            [CLAUDE_BIN, "-p", prompt, "--system-prompt", CONVERT_PROMPT,
              "--output-format", "json", "--model", "sonnet"],
             capture_output=True, text=True, timeout=60
         )
