@@ -39,6 +39,35 @@ BAD: "Check out these amazing results from Lessie AI!"
 BAD: "I found some people for you, here's the link" """
 
 
+def _build_search_prompt(tweet_text: str, author: str = "") -> str:
+    """Use Claude CLI to convert a hiring tweet into a complete Lessie search prompt."""
+    claude = "/Users/lessie/Library/Application Support/Claude/claude-code/2.1.92/claude.app/Contents/MacOS/claude"
+    import subprocess, os
+    env = os.environ.copy()
+    env["PATH"] = os.path.expanduser("~/.nvm/versions/node/v24.14.1/bin") + ":" + env.get("PATH", "")
+
+    prompt = (
+        "You are writing a search prompt for Lessie, a people search engine. "
+        "Given a hiring tweet, write a complete natural-language search prompt Lessie can use to find matching candidates. "
+        "Include: role title, key skills, seniority level, location if mentioned, and any specific requirements. "
+        "Format: 'Find [role] with [skills], [location if any], open to [type] roles.' "
+        "Be specific. Output ONLY the search prompt, no quotes, no explanation.\n\n"
+        f"Hiring tweet:\n{tweet_text[:600]}"
+    )
+    try:
+        r = subprocess.run(
+            [claude, "-p", prompt, "--output-format", "text"],
+            capture_output=True, text=True, timeout=30, env=env
+        )
+        result = r.stdout.strip()
+        if result and 20 < len(result) < 500:
+            print(f"[bridge] search prompt: {result[:100]}")
+            return result
+    except Exception as e:
+        print(f"[bridge] _build_search_prompt failed: {e}")
+    return tweet_text[:400] or f"{author} hiring talent"
+
+
 def _create_share_link(checkpoint: str) -> str | None:
     """Create a Lessie web conversation and return a public share link.
 

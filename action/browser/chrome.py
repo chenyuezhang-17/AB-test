@@ -3,6 +3,7 @@
 Connects to a running Chrome instance with --remote-debugging-port=9222,
 reusing existing login sessions and cookies.
 """
+from __future__ import annotations
 
 import asyncio
 import base64

@@ -98,7 +98,7 @@ HTML = """<!DOCTYPE html>
 <head>
   <title>Lessie · Twitter Digital Employee</title>
   <meta charset="utf-8">
-  <meta http-equiv="refresh" content="15">
+  <!-- no auto-refresh: CDP browser is shared with posting, don't hijack it -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Caveat:wght@400;500;600;700&family=Space+Grotesk:wght@400;500;600&display=swap" rel="stylesheet">
   <style>
@@ -126,88 +126,88 @@ HTML = """<!DOCTYPE html>
     /* Layout: sidebar + main */
     .layout {
       display: grid;
-      grid-template-columns: 180px 1fr;
+      grid-template-columns: 140px 1fr;
       min-height: 100vh;
     }
 
     /* Sidebar */
     .sidebar {
       border-right: 2px solid var(--ink);
-      padding: 20px 16px;
+      padding: 14px 12px;
       display: flex;
       flex-direction: column;
-      gap: 4px;
+      gap: 2px;
     }
     .brand {
-      font-size: 1.1rem;
+      font-size: 0.95rem;
       font-weight: 700;
-      margin-bottom: 4px;
+      margin-bottom: 3px;
       line-height: 1;
     }
     .brand-line {
       height: 2px;
       background: var(--ink);
-      margin-bottom: 16px;
+      margin-bottom: 12px;
     }
     .nav-item {
       display: flex;
       align-items: center;
-      gap: 8px;
-      font-size: 0.85rem;
-      padding: 5px 0;
+      gap: 6px;
+      font-size: 0.8rem;
+      padding: 4px 0;
       color: var(--muted);
       cursor: default;
     }
-    .nav-item.active {
-      color: var(--ink);
-    }
+    .nav-item.active { color: var(--ink); }
     .nav-item.active .nav-icon {
       background: rgba(54,69,217,0.12);
       border: 1.5px solid var(--ink);
-      border-radius: 6px;
-      padding: 2px 4px;
-      font-size: 0.75rem;
+      border-radius: 4px;
+      padding: 1px 3px;
+      font-size: 0.7rem;
     }
-    .nav-icon { font-size: 0.85rem; }
+    .nav-icon { font-size: 0.8rem; }
     .sidebar-bottom {
       margin-top: auto;
-      font-size: 0.78rem;
+      font-size: 0.72rem;
       color: var(--muted);
       display: flex;
       align-items: center;
-      gap: 6px;
+      gap: 5px;
     }
 
     /* Main content */
     .main {
-      padding: 24px 32px;
+      padding: 16px 20px;
+      min-width: 0;
     }
     .main-header {
-      margin-bottom: 20px;
+      display: flex;
+      align-items: baseline;
+      gap: 12px;
+      margin-bottom: 12px;
     }
     .main-header h1 {
-      font-size: 1.6rem;
+      font-size: 1.1rem;
       font-weight: 700;
       line-height: 1.1;
     }
     .main-header .sub {
-      font-size: 0.82rem;
+      font-size: 0.75rem;
       color: var(--muted);
-      margin-top: 4px;
     }
     .live-badge {
       display: inline-flex;
       align-items: center;
-      gap: 6px;
+      gap: 5px;
       border: 1.5px solid var(--ink);
       border-radius: 4px;
-      padding: 3px 10px;
-      font-size: 0.9rem;
-      float: right;
-      margin-top: 6px;
+      padding: 2px 8px;
+      font-size: 0.75rem;
+      margin-left: auto;
     }
     .live-dot {
-      width: 7px; height: 7px;
+      width: 6px; height: 6px;
       background: var(--red);
       border-radius: 50%;
       animation: blink 1.8s infinite;
@@ -221,23 +221,23 @@ HTML = """<!DOCTYPE html>
     .cards {
       display: grid;
       grid-template-columns: repeat(3, 1fr);
-      gap: 16px;
-      margin-bottom: 20px;
+      gap: 10px;
+      margin-bottom: 12px;
     }
     .card {
-      border: 2px solid var(--ink);
+      border: 1.5px solid var(--ink);
       border-radius: 4px;
-      padding: 18px 20px 20px;
+      padding: 10px 14px 12px;
       position: relative;
       background: var(--bg);
     }
     .card-label {
-      font-size: 0.75rem;
+      font-size: 0.7rem;
       color: var(--muted);
-      margin-bottom: 6px;
+      margin-bottom: 4px;
     }
     .card-num {
-      font-size: 1.8rem;
+      font-size: 1.4rem;
       font-weight: 700;
       line-height: 1;
       color: var(--ink);
@@ -245,20 +245,19 @@ HTML = """<!DOCTYPE html>
     .card-num.blue { color: #3645d9; }
     .card-squiggle {
       position: absolute;
-      bottom: 14px;
-      right: 16px;
+      bottom: 8px;
+      right: 10px;
       color: var(--muted);
-      font-size: 1.4rem;
-      font-weight: 400;
+      font-size: 1rem;
       font-style: italic;
     }
 
-    /* Two column lower */
+    /* Two column lower — Scene1 + Scene2 side by side */
     .lower {
       display: grid;
       grid-template-columns: 1fr 1fr;
-      gap: 16px;
-      margin-bottom: 20px;
+      gap: 12px;
+      margin-bottom: 12px;
     }
 
     /* Engagement panel */
@@ -375,9 +374,9 @@ HTML = """<!DOCTYPE html>
   <!-- Main -->
   <div class="main">
     <div class="main-header">
+      <h1>Leego · Overview</h1>
+      <div class="sub">Today's pipeline activity</div>
       <span class="live-badge"><span class="live-dot"></span> {{ now }}</span>
-      <h1>Here's what Leego has been up to.</h1>
-      <div class="sub">Your Twitter Digital Employee overview for today.</div>
     </div>
 
     <!-- Stat cards -->
@@ -447,7 +446,6 @@ def get_today_queue():
 
 @app.route("/")
 def index():
-    refresh_engagement()
     stats = get_stats()
     queue = get_today_queue()
     today = datetime.now().strftime("%Y-%m-%d")
@@ -475,34 +473,28 @@ def index():
         hidden = 'display:none' if collapsed else ''
 
         if already:
-            btn = '<span style="font-size:0.82rem;color:#166534;font-weight:600">✓ Posted</span>'
+            btn = '<span style="font-size:0.72rem;color:#166534;font-weight:600">✓ Done</span>'
         elif remaining == 0:
-            btn = '<span style="font-size:0.82rem;color:#8a8880">Limit reached</span>'
+            btn = '<span style="font-size:0.72rem;color:#8a8880">Limit</span>'
         else:
             btn = (f'<button onclick="postReply(\'{tweet_id}\',\'{author}\',this)" '
-                   f'style="font-size:0.82rem;font-weight:700;padding:6px 12px;border:1.5px solid #111;'
-                   f'border-radius:4px;background:#111;color:#fff;cursor:pointer;white-space:nowrap">Post Reply</button>')
+                   f'style="font-size:0.72rem;font-weight:700;padding:3px 8px;border:1.5px solid #111;'
+                   f'border-radius:4px;background:#111;color:#fff;cursor:pointer;white-space:nowrap">Post</button>')
 
-        intent_badge = f'<span style="font-size:0.72rem;background:#0e7490;color:#cffafe;padding:2px 7px;border-radius:3px;margin-left:6px">{intent}</span>' if intent else ''
+        intent_badge = f'<span style="font-size:0.65rem;background:#0e7490;color:#cffafe;padding:1px 5px;border-radius:3px;margin-left:5px">{intent}</span>' if intent else ''
         date_str = (c["ts"] or "")[:10]
         return (
-            f'<div class="s2-extra" style="{hidden};padding:10px 14px;border-radius:6px;margin-bottom:6px;background:#faf9f6;border:1.5px solid #e5e2d8">'
-            f'<div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">'
-            f'<span style="font-size:0.88rem;font-weight:700">@{author}</span>{intent_badge}'
-            f'<span style="font-weight:400;color:#8a8880;margin-left:auto;font-size:0.75rem">{date_str}</span>'
+            f'<div class="s2-extra" style="{hidden};padding:7px 10px;border-radius:5px;margin-bottom:5px;background:#faf9f6;border:1.5px solid #e5e2d8">'
+            f'<div style="display:flex;align-items:center;gap:6px;margin-bottom:3px">'
+            f'<span style="font-size:0.8rem;font-weight:700">@{author}</span>{intent_badge}'
+            f'<span style="color:#8a8880;margin-left:auto;font-size:0.65rem">{date_str}</span>'
             f'{btn}</div>'
-            f'<div style="font-size:0.82rem;color:#444;line-height:1.45">{text}</div>'
+            f'<div style="font-size:0.75rem;color:#444;line-height:1.4;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{text}</div>'
             f'</div>'
         )
 
-    top_c = candidates[:4]
-    rest_c = candidates[4:]
-    cands_top  = "".join(_candidate_row(c, collapsed=False) for c in top_c)
-    cands_rest = "".join(_candidate_row(c, collapsed=True)  for c in rest_c)
-    show_more_c = (f'<button onclick="toggleMoreS2(this)" style="font-size:0.82rem;color:#111;background:none;border:none;cursor:pointer;padding:4px 0;font-weight:600">'
-                   f'▸ Show {len(rest_c)} more candidates</button>') if rest_c else ''
-    candidates_html = (cands_top + cands_rest + show_more_c) if candidates else \
-        '<div style="color:#8a8880;font-style:italic;font-size:0.88rem;padding:16px 0">No candidates scanned today yet.</div>'
+    candidates_html = "".join(_candidate_row(c, collapsed=False) for c in candidates) if candidates else \
+        '<div style="color:#8a8880;font-style:italic;font-size:0.82rem;padding:12px 0">No candidates scanned today yet.</div>'
 
     scene1_disabled = 'disabled style="opacity:.5;cursor:not-allowed"' if remaining == 0 else ''
 
@@ -523,26 +515,20 @@ def index():
             btn = '<span style="font-size:0.82rem;color:#8a8880">Limit reached</span>'
         else:
             btn = (f'<button onclick="selectTrend({tid},this)" '
-                   f'style="font-size:0.82rem;font-weight:700;padding:6px 14px;border:1.5px solid #3645d9;'
-                   f'border-radius:4px;background:#3645d9;color:white;cursor:pointer;white-space:nowrap">Use this</button>')
+                   f'style="font-size:0.72rem;font-weight:700;padding:3px 8px;border:1.5px solid #3645d9;'
+                   f'border-radius:4px;background:#3645d9;color:white;cursor:pointer;white-space:nowrap">Use</button>')
         return (
-            f'<div class="trend-extra" style="{style};display:{"none" if collapsed else "flex"};align-items:center;gap:12px;padding:10px 14px;border-radius:6px;margin-bottom:6px;background:#faf9f6;border:1.5px solid #e5e2d8">'
+            f'<div class="trend-extra" style="{style};display:{"none" if collapsed else "flex"};align-items:center;gap:8px;padding:7px 10px;border-radius:5px;margin-bottom:5px;background:#faf9f6;border:1.5px solid #e5e2d8">'
             f'<div style="flex:1;min-width:0">'
-            f'<div style="font-size:0.92rem;font-weight:600;line-height:1.35;margin-bottom:3px">{hook[:120]}</div>'
-            f'<div style="font-size:0.78rem;color:#8a8880">{topic[:80]}<span style="margin-left:8px;opacity:.6">{date}</span></div>'
+            f'<div style="font-size:0.8rem;font-weight:600;line-height:1.3;margin-bottom:1px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{hook[:100]}</div>'
+            f'<div style="font-size:0.68rem;color:#8a8880">{topic[:60]}<span style="margin-left:6px;opacity:.6">{date}</span></div>'
             f'</div>'
             f'<div style="flex-shrink:0">{btn}</div>'
             f'</div>'
         )
 
-    top5 = trend_candidates[:5]
-    rest  = trend_candidates[5:]
-    top_html  = ''.join(_trend_card(t, collapsed=False) for t in top5)
-    rest_html = ''.join(_trend_card(t, collapsed=True)  for t in rest)
-    show_more = (f'<button onclick="toggleMore(this)" style="font-size:0.82rem;color:#3645d9;background:none;border:none;cursor:pointer;padding:4px 0;font-weight:600">'
-                 f'▸ Show {len(rest)} more topics</button>') if rest else ''
-    trends_html = (top_html + rest_html + show_more) if trend_candidates else \
-        '<div style="color:#8a8880;font-size:0.88rem;font-style:italic;padding:16px 0">No trends scanned yet — click Scan Now to fetch today\'s hot topics.</div>'
+    trends_html = ''.join(_trend_card(t, collapsed=False) for t in trend_candidates) if trend_candidates else \
+        '<div style="color:#8a8880;font-size:0.82rem;font-style:italic;padding:12px 0">No trends scanned yet — click Scan to fetch today\'s hot topics.</div>'
 
     # Replace the lower section content
     dashboard_html = HTML.replace(
@@ -550,59 +536,39 @@ def index():
         f"""<!-- Lower: Queue + Activity -->
     {limit_bar}
 
-    <!-- Scene 1 -->
-    <div style="border:2px solid var(--ink);border-radius:4px;padding:20px 24px;margin-bottom:16px">
-      <div style="display:flex;align-items:center;gap:12px;margin-bottom:14px">
-        <span style="background:#3645d9;color:white;font-size:0.78rem;font-weight:700;padding:3px 10px;border-radius:3px">S1</span>
-        <span style="font-size:1rem;font-weight:700">Scene 1 · Trend Posts</span>
-        <span style="font-size:0.82rem;color:#8a8880">Today's hot topics — pick one, Leego drafts + posts</span>
-        <button onclick="scanTrends(this)" style="margin-left:auto;font-size:0.82rem;font-weight:700;padding:6px 16px;border:1.5px solid #111;border-radius:4px;background:#fff;cursor:pointer">↻ Scan Now</button>
-      </div>
-      <div id="trendsContainer">{trends_html}</div>
-      <div id="s1preview" style="margin-top:14px;display:none;border-top:1.5px solid #e5e2d8;padding-top:14px">
-        <div style="font-size:0.82rem;color:#8a8880;margin-bottom:6px">Preview — edit if needed before posting</div>
-        <textarea id="s1text" style="width:100%;padding:10px 12px;border:1.5px solid #d4d0c8;border-radius:4px;font-size:0.9rem;font-family:inherit;resize:vertical;min-height:90px;background:#faf9f6;line-height:1.6"></textarea>
-        <div style="display:flex;gap:10px;margin-top:10px">
-          <button onclick="postTrend()" id="s1postBtn"
-            style="padding:8px 20px;border:1.5px solid #3645d9;border-radius:4px;background:#3645d9;color:white;font-size:0.88rem;font-weight:700;cursor:pointer">
-            ↗ Post this tweet
-          </button>
-          <button onclick="document.getElementById('s1preview').style.display='none'"
-            style="padding:8px 14px;border:1.5px solid #d4d0c8;border-radius:4px;background:#fff;font-size:0.88rem;cursor:pointer">Cancel</button>
+    <!-- Scene 1 + Scene 2 side by side -->
+    <div class="lower">
+
+      <!-- Scene 1 -->
+      <div style="border:1.5px solid var(--ink);border-radius:4px;padding:14px 16px;min-width:0">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">
+          <span style="background:#3645d9;color:white;font-size:0.7rem;font-weight:700;padding:2px 7px;border-radius:3px">S1</span>
+          <span style="font-size:0.88rem;font-weight:700">Trend Posts</span>
+          <button onclick="scanTrends(this)" style="margin-left:auto;font-size:0.75rem;font-weight:700;padding:3px 10px;border:1.5px solid #111;border-radius:4px;background:#fff;cursor:pointer">↻ Scan</button>
+        </div>
+        <div style="font-size:0.72rem;color:#8a8880;margin-bottom:8px">Pick a topic → Leego drafts + posts</div>
+        <div id="trendsContainer" style="max-height:480px;overflow-y:auto;padding-right:4px">{trends_html}</div>
+        <div id="s1preview" style="margin-top:10px;display:none;border-top:1.5px solid #e5e2d8;padding-top:10px">
+          <textarea id="s1text" style="width:100%;padding:8px 10px;border:1.5px solid #d4d0c8;border-radius:4px;font-size:0.82rem;font-family:inherit;resize:vertical;min-height:80px;background:#faf9f6;line-height:1.5"></textarea>
+          <div style="display:flex;gap:8px;margin-top:8px">
+            <button onclick="postTrend()" id="s1postBtn"
+              style="padding:6px 14px;border:1.5px solid #3645d9;border-radius:4px;background:#3645d9;color:white;font-size:0.8rem;font-weight:700;cursor:pointer">↗ Post</button>
+            <button onclick="document.getElementById('s1preview').style.display='none'"
+              style="padding:6px 10px;border:1.5px solid #d4d0c8;border-radius:4px;background:#fff;font-size:0.8rem;cursor:pointer">Cancel</button>
+          </div>
         </div>
       </div>
-    </div>
 
-    <!-- Scene 2 + Recent Activity -->
-    <div class="lower">
-      <div class="panel">
-        <div style="font-size:1rem;font-weight:700;margin-bottom:4px">Scene 2 · Reply Candidates</div>
-        <div style="font-size:0.82rem;color:#8a8880;margin-bottom:10px">Tweets matched — click to reply with Lessie results</div>
-        {candidates_html}
+      <!-- Scene 2 -->
+      <div style="border:1.5px solid var(--ink);border-radius:4px;padding:14px 16px;min-width:0">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">
+          <span style="background:#e8321a;color:white;font-size:0.7rem;font-weight:700;padding:2px 7px;border-radius:3px">S2</span>
+          <span style="font-size:0.88rem;font-weight:700">Reply Candidates</span>
+        </div>
+        <div style="font-size:0.72rem;color:#8a8880;margin-bottom:8px">Matched tweets — quote repost with Lessie results</div>
+        <div style="max-height:480px;overflow-y:auto;padding-right:4px">{candidates_html}</div>
       </div>
 
-      <div class="activity-panel">
-        <div class="activity-title">Recent Activity</div>
-        {{% if stats.recent %}}
-          {{% for r in stats.recent[:6] %}}
-          <div class="activity-item">
-            <div class="activity-avatar {{% if r.stage == 'action' %}}red{{% endif %}}">
-              {{{{ r.stage[:2].upper() if r.stage else '?' }}}}
-            </div>
-            <div class="activity-content">
-              <div class="activity-name">
-                {{% if r.author %}}@{{{{ r.author }}}}{{% else %}}{{{{ r.stage }}}}{{% endif %}}
-                {{% if r.intent %}} · <span style="font-weight:400;color:var(--muted)">{{{{ r.intent }}}}</span>{{% endif %}}
-              </div>
-              <div class="activity-desc">{{{{ r.tweet_text or r.detail or "—" }}}}</div>
-              <div class="activity-time">{{{{ r.ts[11:19] }}}} · {{{{ r.status or "" }}}}</div>
-            </div>
-          </div>
-          {{% endfor %}}
-        {{% else %}}
-          <div class="empty-state">Waiting for pipeline to run...</div>
-        {{% endif %}}
-      </div>
     </div>
 
     <script>
@@ -852,12 +818,17 @@ def api_post():
     try:
         from dotenv import load_dotenv
         load_dotenv(Path(__file__).parent.parent / ".env")
-        from bridge.search import _create_share_link
+        from bridge.search import _create_share_link, _build_search_prompt
         from action.browser_post import post_reply_browser
         from db_log import log_action
 
         tweet_url = f"https://x.com/{author}/status/{tweet_id}"
-        checkpoint = f"Find people relevant to hiring needs from @{author} on Twitter"
+        # Get original tweet text and build a proper Lessie search prompt
+        conn2 = sqlite3.connect(DB_PATH)
+        row2 = conn2.execute("SELECT tweet_text FROM activity_log WHERE tweet_id=? LIMIT 1", (tweet_id,)).fetchone()
+        conn2.close()
+        tweet_text_raw = (row2[0] or "") if row2 else ""
+        checkpoint = _build_search_prompt(tweet_text_raw, author)
         share_url = _create_share_link(checkpoint) or "https://lessie.ai"
 
         reply = f"ran a search on this — here's a relevant talent pool that might help 👀\n\n{share_url}"
@@ -1042,6 +1013,16 @@ def settings():
     settings_html = settings_html.replace('<!-- Engagement grid -->', '<!-- hidden --><!--').replace('<!-- Activity Log -->', '--><!-- Activity Log -->')
 
     return render_template_string(settings_html, stats=get_stats(), now=datetime.now().strftime("%H:%M:%S"), page="settings")
+
+@app.route("/api/refresh-engagement", methods=["POST"])
+def api_refresh_engagement():
+    """Manually trigger engagement scraping — only call when Chrome is free."""
+    try:
+        refresh_engagement()
+        return jsonify({"ok": True})
+    except Exception as e:
+        return jsonify({"ok": False, "error": str(e)})
+
 
 @app.route("/api/scan-trends", methods=["POST"])
 def api_scan_trends():

@@ -7,6 +7,7 @@ Provides the interface between AI and the browser:
 - Take annotated screenshots
 - Scroll, navigate, etc.
 """
+from __future__ import annotations
 
 import asyncio
 from pathlib import Path

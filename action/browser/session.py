@@ -2,6 +2,7 @@
 
 Keeps a single Chrome CDP connection alive across multiple CLI calls.
 """
+from __future__ import annotations
 
 import asyncio
 import json

@@ -80,16 +80,23 @@ def post_tweet_browser(text: str) -> tuple[bool, str]:
     bw("goto", "https://x.com/home", timeout=20)
     time.sleep(3)
 
+    # Click label to expand compose box, then wait for textarea
+    bw("eval", """(function(){
+        const label = document.querySelector('[data-testid="tweetTextarea_0_label"]');
+        if (label) label.click();
+    })()""")
+    time.sleep(1.5)
+
     # Wait for compose box
-    for _ in range(8):
+    for _ in range(10):
         check = bw("eval", "document.querySelector('[data-testid=\"tweetTextarea_0\"][role=\"textbox\"]') ? 'ok' : 'no'")
         if check.get("value") == "ok":
             break
         time.sleep(1)
 
     # Focus
-    focus = bw("eval", "(function(){const el=document.querySelector('[data-testid=\"tweetTextarea_0\"][role=\"textbox\"]'); el.click(); el.focus(); return document.activeElement===el ? 'ok' : 'failed';})()")
-    if focus.get("value") != "ok":
+    focus = bw("eval", "(function(){const el=document.querySelector('[data-testid=\"tweetTextarea_0\"][role=\"textbox\"]'); if(!el) return 'not_found'; el.click(); el.focus(); return document.activeElement===el ? 'ok' : 'focused';})()")
+    if focus.get("value") not in ("ok", "focused"):
         return False, f"focus failed: {focus.get('value')}"
 
     # Type text
