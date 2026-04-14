@@ -60,10 +60,19 @@ def fetch_trends() -> list[dict]:
     seen = set()
 
     queries = [
+        # hiring / talent market
         f"major tech layoffs {today}",
-        f"AI startup funding raised {today}",
-        f"new AI tool product launch this week",
         f"tech company hiring surge remote jobs {today}",
+        # startup / funding → find founders & builders
+        f"AI startup funding raised {today}",
+        f"new unicorn startup founded {today}",
+        # new products → find builders, KOLs, early adopters
+        f"new AI tool product launch this week",
+        f"viral app launch indie hacker {today}",
+        # creator economy → find KOLs
+        f"top creator influencer marketing deal brand {today}",
+        # expert demand → consultants, advisors
+        f"demand for AI consultants experts 2026",
     ]
 
     for query in queries:

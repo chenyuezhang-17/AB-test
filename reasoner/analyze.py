@@ -22,18 +22,34 @@ CLAUDE_BIN = os.getenv(
     "/Users/lessie/Library/Application Support/Claude/claude-code/2.1.92/claude.app/Contents/MacOS/claude"
 )
 
-INTENT_PROMPT = """You analyze tweets to detect people-search intent.
+INTENT_PROMPT = """You analyze tweets to detect people-search intent for Lessie, a people search engine.
 
 Given a tweet, determine if this person genuinely needs help finding someone.
+
+## Intent types — pick the BEST match:
+- "hiring"              → company/team actively hiring for a role
+- "looking_for_cofounder" → seeking a co-founder, technical partner, or startup collaborator
+- "looking_for_expert"  → need a consultant, advisor, auditor, or domain expert (not a full-time hire)
+- "looking_for_kol"     → brand/creator looking for influencers, reviewers, content creators, or ambassadors
+- "looking_for_investor" → startup/founder seeking VCs, angels, or strategic investors
+- "looking_for_partner" → seeking business partners, resellers, agencies, or integration partners
+- "talent_scouting"     → proactively asking "who are the best X?" or scouting specific profiles
+- "recommendation"      → asking their network to recommend or refer someone specific
+- "looking_for_service" → need a freelancer, agency, or service provider for a project
+
+## Rules:
+- has_intent = true ONLY if there is a REAL, ACTIONABLE need to find a specific type of person
+- Exclude: venting, bragging, generic industry commentary, joke tweets, news sharing
+- Exclude: "looking for job" posts (the person IS the seeker, not the finder)
+- Confidence > 0.8 = clear explicit ask; 0.6-0.8 = implied but real need; < 0.6 = too vague
+
 Respond in JSON only, no markdown:
 {
   "has_intent": true/false,
-  "intent": "hiring" | "looking_for" | "recommendation",
+  "intent": "<one of the types above>",
   "confidence": 0.0-1.0,
-  "raw_need": "one sentence: what they need in plain language"
-}
-
-If the tweet is venting, joking, or not a real request, set has_intent=false."""
+  "raw_need": "one sentence: exactly what kind of person they need"
+}"""
 
 
 PROFILE_PROMPT = """You are a growth intelligence analyst. Given a Twitter user's tweet,

@@ -12,7 +12,23 @@ TIKHUB_BASE = "https://api.tikhub.io"
 def scan_tweets() -> list[ScannedTweet]:
     """Fetch tweets matching intent keywords from Twitter API via TikHub."""
     api_key = os.getenv("TIKHUB_API_KEY")
-    keywords_raw = os.getenv("SCAN_KEYWORDS", "looking for a developer,hiring AI engineer,need a frontend developer,recommend an engineer,looking for cofounder")
+    keywords_raw = os.getenv("SCAN_KEYWORDS", ",".join([
+        # hiring
+        "hiring AI engineer", "we are hiring", "join our team", "open role",
+        # cofounder / collaborator
+        "looking for cofounder", "looking for co-founder", "need a technical cofounder", "seeking collaborator",
+        # expert / consultant / advisor
+        "looking for an advisor", "need an expert in", "looking for a consultant", "need someone who knows",
+        "anyone know a good", "can anyone recommend a",
+        # KOL / creator
+        "looking for creators", "looking for influencers", "seeking brand ambassadors", "collab with us",
+        # investor
+        "looking for investors", "raising a round", "seeking angel investors", "looking for VCs",
+        # talent scouting
+        "who are the best", "who builds the best", "know anyone who specializes in",
+        # freelance / project
+        "looking for a freelancer", "need someone to build", "looking for agency",
+    ]))
     keywords = [k.strip() for k in keywords_raw.split(",")]
 
     seen_ids = set()
