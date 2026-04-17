@@ -12,7 +12,8 @@ mkdir -p "$LEEGO_PROFILE"
   --no-first-run \
   --no-default-browser-check \
   --window-size=1280,900 \
-  "https://x.com" &
+  "https://x.com" "https://app.lessie.ai" &
 
 echo "✓ Leego Chrome started (profile: $LEEGO_PROFILE)"
 echo "  Log into Twitter as @alliiexia if not already logged in."
+echo "  Log into Lessie in the second tab (needed for CDP share links)."
