@@ -5,6 +5,7 @@ Visit: http://localhost:5000
 """
 
 import os
+import sys
 import sqlite3
 from datetime import datetime, timezone
 from pathlib import Path
@@ -499,6 +500,7 @@ def index():
     scene1_disabled = 'disabled style="opacity:.5;cursor:not-allowed"' if remaining == 0 else ''
 
     # Load trend candidates from DB
+    sys.path.insert(0, str(Path(__file__).parent.parent))
     from db_log import get_trend_candidates
     trend_candidates = get_trend_candidates()
 

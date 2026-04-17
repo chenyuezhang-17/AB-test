@@ -15,6 +15,7 @@ from browser.controller import BrowserController
 
 SOCKET_PATH = "/tmp/social-browser.sock"
 PID_FILE = "/tmp/social-browser.pid"
+DEFAULT_CDP = "http://localhost:9222"
 
 
 async def handle_client(
@@ -24,7 +25,13 @@ async def handle_client(
 ):
     """Handle a single command from the CLI."""
     try:
-        data = await asyncio.wait_for(reader.read(65536), timeout=10)
+        chunks = []
+        while True:
+            chunk = await asyncio.wait_for(reader.read(65536), timeout=10)
+            if not chunk:
+                break
+            chunks.append(chunk)
+        data = b"".join(chunks)
         request = json.loads(data.decode())
     except Exception as e:
         writer.write(json.dumps({"error": f"bad request: {e}"}).encode())

@@ -75,7 +75,8 @@ class ChromeBrowser:
                 self.target_id = create_resp["result"]["targetId"]
                 await browser_ws.close()
 
-                ws_url = f"ws://localhost:9222/devtools/page/{self.target_id}"
+                port = self.cdp_url.split(":")[-1].rstrip("/")
+                ws_url = f"ws://localhost:{port}/devtools/page/{self.target_id}"
                 print(f"Created new tab: {new_url[:80]}")
 
         self._ws = await websockets.connect(ws_url, max_size=50 * 1024 * 1024)

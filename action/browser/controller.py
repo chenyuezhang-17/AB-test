@@ -22,8 +22,8 @@ _LABELS_JS = (Path(__file__).parent / "labels.js").read_text()
 class BrowserController:
     """AI-friendly browser controller with element labeling."""
 
-    def __init__(self):
-        self.chrome = ChromeBrowser()
+    def __init__(self, cdp_url: str | None = None):
+        self.chrome = ChromeBrowser(cdp_url=cdp_url) if cdp_url else ChromeBrowser()
         self._labels: list[dict[str, Any]] = []
 
     async def start(self, url: str | None = None) -> None:

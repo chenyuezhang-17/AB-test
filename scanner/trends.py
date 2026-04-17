@@ -92,18 +92,25 @@ def fetch_trends() -> list[dict]:
     return trends
 
 
-CONVERT_PROMPT = """You convert trending topics into Lessie people-search prompts.
+CONVERT_PROMPT = """You convert trending topics into Lessie people-search prompts AND high-performing tweets.
 
-Given a trending topic and its context, generate a search prompt that:
-1. Connects the trend to PEOPLE (talent, experts, creators, leaders)
-2. Is specific enough to produce impressive results
-3. Would make a great tweet: "Just ran a search on [topic] — here's who's leading this space"
+Given a trending topic and its context, generate a search prompt AND a tweet hook.
+
+## Tweet hook rules:
+- Write like a smart insider, NOT a marketer
+- Lead with a SPECIFIC data point, contrarian take, or surprising insight from the trend
+- Make it feel like an observation, not an ad ("I searched this and found..." NOT "Check out Lessie!")
+- Create genuine curiosity — the reader should think "wait, really?"
+- Under 240 chars total (hook + link)
+- English only, lowercase tone, 1 emoji max
+- DO NOT use phrases like "ran a search", "here's who", "check this out"
+- GOOD hooks make a claim or ask a question the trend raises about PEOPLE
 
 Output JSON only:
 {
   "should_post": true/false,
   "search_prompt": "the Lessie search checkpoint (2-3 sentences, specific)",
-  "tweet_hook": "one-line tweet intro that ties the trend to the search (under 150 chars)",
+  "tweet_hook": "tweet text under 200 chars — a sharp take or data point about the people behind this trend",
   "filter": {
     "person_titles": ["if B2B"],
     "person_locations": ["if relevant"],
@@ -117,13 +124,14 @@ Output JSON only:
 Set should_post=false if the topic is too generic, controversial, or not related to people.
 
 Examples:
-- Topic: "Sora AI video generation launch" →
-  search_prompt: "Find AI researchers and engineers who specialize in video generation, diffusion models, or text-to-video. Target people from OpenAI, Runway, Stability AI, Pika Labs who publish on these topics."
-  tweet_hook: "sora just dropped and everyone's asking who built this — here's the talent behind AI video gen 🎬"
-
 - Topic: "Stripe layoffs 300 engineers" →
-  search_prompt: "Find senior engineers who recently worked at Stripe, specializing in payments infrastructure, distributed systems, or fintech platform engineering. These are top-tier candidates now on the market."
-  tweet_hook: "300 Stripe engineers just hit the market — ran a search, some of these resumes are insane 👀"
+  tweet_hook: "300 Stripe engineers just hit the market. payments infra + distributed systems background, mostly senior. wild timing given how many fintechs are still hiring 👀"
+
+- Topic: "52K tech layoffs Q1 2026" →
+  tweet_hook: "52K tech workers laid off in Q1 alone — the majority are mid-senior engineers, not juniors. companies cutting the wrong people?"
+
+- Topic: "AI startup funding boom 2026" →
+  tweet_hook: "VCs deployed $8.4B into AI in Q1. the founders getting funded all have one thing in common — look who's actually building these teams"
 
 - Topic: "TikTok ban debate" →
   should_post: false (too political, not people-search related)"""

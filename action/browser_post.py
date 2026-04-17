@@ -53,11 +53,28 @@ def bw(cmd: str, arg: str = "", timeout: int = 30) -> dict:
     return asyncio.run(_send(cmd, arg, timeout))
 
 
-def ensure_session() -> bool:
-    """Start browser session if not running."""
-    if _is_session_running():
-        return True
-    import subprocess
+def _session_healthy() -> bool:
+    """Check if session is running AND the WebSocket is alive (real ping)."""
+    if not _is_session_running():
+        return False
+    try:
+        r = asyncio.run(_send("ping", "", timeout=5))
+        return r.get("ok", False)
+    except Exception:
+        return False
+
+
+def _restart_session() -> bool:
+    """Kill stale session files and start a fresh one."""
+    import os, subprocess
+    # Clean up stale socket/pid
+    for f in [SOCKET_PATH, "/tmp/social-browser.pid"]:
+        try: os.remove(f)
+        except: pass
+    # Kill any zombie session process
+    import subprocess as _sp
+    _sp.run(["pkill", "-f", "browser.session"], capture_output=True)
+    time.sleep(1)
     proc = subprocess.Popen(
         [sys.executable, "-m", "browser.session"],
         cwd=Path(__file__).parent,
@@ -67,9 +84,16 @@ def ensure_session() -> bool:
     )
     for _ in range(20):
         time.sleep(0.5)
-        if _is_session_running():
+        if _session_healthy():
             return True
     return False
+
+
+def ensure_session() -> bool:
+    """Ensure session is running and healthy; restart if WebSocket is dead."""
+    if _session_healthy():
+        return True
+    return _restart_session()
 
 
 def post_tweet_browser(text: str) -> tuple[bool, str]:
@@ -94,15 +118,28 @@ def post_tweet_browser(text: str) -> tuple[bool, str]:
             break
         time.sleep(1)
 
-    # Focus
-    focus = bw("eval", "(function(){const el=document.querySelector('[data-testid=\"tweetTextarea_0\"][role=\"textbox\"]'); if(!el) return 'not_found'; el.click(); el.focus(); return document.activeElement===el ? 'ok' : 'focused';})()")
-    if focus.get("value") not in ("ok", "focused"):
-        return False, f"focus failed: {focus.get('value')}"
+    # Focus compose box
+    focus_s1 = bw("eval", """(function(){
+        const el = document.querySelector('[data-testid="tweetTextarea_0"][role="textbox"]');
+        if (!el) return 'not_found';
+        el.click(); el.focus();
+        return 'ok';
+    })()""")
+    if focus_s1.get("value") not in ("ok",):
+        return False, f"focus failed: {focus_s1.get('value')}"
 
-    # Type text
-    result = bw("type", text)
+    # Type via CDP Input.insertText (not ClipboardEvent which Twitter intercepts)
+    result = bw("type", text, timeout=60)
     if not result.get("ok"):
-        return False, f"type failed: {result.get('error')}"
+        insert = bw("eval", f"""(function(){{
+            const el = document.querySelector('[data-testid="tweetTextarea_0"][role="textbox"]');
+            if (!el) return 'not_found';
+            el.focus();
+            document.execCommand('insertText', false, {json.dumps(text)});
+            return el.innerText.trim() ? 'ok' : 'empty';
+        }})()""")
+        if insert.get("value") != "ok":
+            return False, f"text insert failed: {insert.get('value')}"
 
     time.sleep(1)
 
@@ -208,20 +245,34 @@ def post_quote_browser(tweet_url: str, text: str) -> tuple[bool, str]:
             break
         time.sleep(1)
 
-    # Focus compose box
-    focus = bw("eval", """(function(){
-        const el = document.querySelector('[data-testid="tweetTextarea_0"][role="textbox"]');
-        if (!el) return 'not found';
-        el.click(); el.focus();
-        return 'ok';
-    })()""")
-    if focus.get("value") != "ok":
-        return False, f"quote focus failed: {focus.get('value')}"
+    # Insert text using execCommand('selectAll') + insertText — this is the
+    # ONLY reliable way to trigger React's synthetic event and enable the Post button.
+    # CDP Input.insertText and direct .value assignment do NOT activate React state.
+    # We retry up to 3 times and verify the copy text (not just URL) is actually present.
+    copy_anchor = text[:40].replace("\n", " ").strip()  # first 40 chars of copy, no newlines
+    inserted = False
+    for _attempt in range(3):
+        bw("eval", f"""(function(){{
+            const el = document.querySelector('[data-testid="tweetTextarea_0"][role="textbox"]');
+            if (!el) return 'not found';
+            el.click(); el.focus();
+            document.execCommand('selectAll');
+            document.execCommand('insertText', false, {json.dumps(text)});
+        }})()""", timeout=15)
+        time.sleep(1)
+        verify = bw("eval", f"""(function(){{
+            const el = document.querySelector('[data-testid="tweetTextarea_0"][role="textbox"]');
+            if (!el) return 'no_el';
+            const txt = el.innerText || '';
+            return txt.includes({json.dumps(copy_anchor[:20])}) ? 'ok' : 'missing';
+        }})()""", timeout=8)
+        if verify.get("value") == "ok":
+            inserted = True
+            break
+        time.sleep(1)
 
-    # Type quote text
-    result = bw("type", text)
-    if not result.get("ok"):
-        return False, f"type failed: {result.get('error')}"
+    if not inserted:
+        return False, "text insert verify failed after 3 attempts"
 
     time.sleep(1)
 

@@ -41,10 +41,15 @@ BAD: "I found some people for you, here's the link" """
 
 def _build_search_prompt(tweet_text: str, author: str = "") -> str:
     """Use Claude CLI to convert a hiring tweet into a complete Lessie search prompt."""
-    claude = "/Users/lessie/Library/Application Support/Claude/claude-code/2.1.92/claude.app/Contents/MacOS/claude"
     import subprocess, os
+    # Prefer ~/.local/bin/claude (the real CLI), fall back to PATH lookup
+    claude = (
+        "/Users/lessie/.local/bin/claude"
+        if os.path.exists("/Users/lessie/.local/bin/claude")
+        else "claude"
+    )
     env = os.environ.copy()
-    env["PATH"] = os.path.expanduser("~/.nvm/versions/node/v24.14.1/bin") + ":" + env.get("PATH", "")
+    env["PATH"] = "/Users/lessie/.local/bin:" + os.path.expanduser("~/.nvm/versions/node/v24.14.1/bin") + ":" + env.get("PATH", "")
 
     prompt = (
         "You are writing a search prompt for Lessie, a people search engine. "
@@ -102,6 +107,7 @@ def _create_share_link(checkpoint: str) -> str | None:
     }
 
     conversation_id = None
+    has_results = False
     try:
         with httpx.Client(timeout=120) as client:
             with client.stream(
@@ -115,8 +121,14 @@ def _create_share_link(checkpoint: str) -> str | None:
                         continue
                     try:
                         data = json.loads(line[6:])
-                        if "conversation_id" in data:
+                        if "conversation_id" in data and not conversation_id:
                             conversation_id = data["conversation_id"]
+                            print(f"[bridge] Conversation created: {conversation_id}")
+                        # Detect search results arriving (person_info_list, persons, results, etc.)
+                        if any(k in data for k in ("person_info_list", "persons", "results", "total")):
+                            has_results = True
+                        # Stop once we see a completion signal
+                        if data.get("status") in ("done", "finished", "complete") or data.get("is_finished"):
                             break
                     except json.JSONDecodeError:
                         continue
@@ -128,10 +140,12 @@ def _create_share_link(checkpoint: str) -> str | None:
         print("[bridge] No conversation_id from stream")
         return None
 
-    print(f"[bridge] Conversation created: {conversation_id}")
+    if not has_results:
+        print("[bridge] Warning: stream ended with no result events — share page may be empty")
 
-    # Step 2: Wait for search to complete (stream is still running)
-    # We just need the conversation_id, the search runs server-side
+    # Step 2: Brief pause to let server finalize results before creating share
+    import time as _time
+    _time.sleep(2)
 
     # Step 3: Create public share link
     try:

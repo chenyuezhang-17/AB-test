@@ -1,4 +1,5 @@
 """Helper to log pipeline activity to activity.db."""
+import json
 import sqlite3
 from datetime import datetime, timezone
 from pathlib import Path
@@ -94,73 +95,123 @@ def log_action(reply_text: str, lessie_url: str, original_tweet_id: str = "",
 
 
 def scrape_engagement():
-    """Scrape likes/retweets/views for our posted tweets via browser CDP."""
-    import asyncio, json, sys
-    sys.path.insert(0, "/tmp/2026040801")
+    """Scrape likes/retweets/views for our posted tweets.
 
-    async def _scrape(tweet_url: str) -> dict:
-        from browser.session import BrowserController  # type: ignore
-        pass
+    Strategy: navigate to @alliiexia/with_replies (our profile timeline),
+    then read engagement for each visible tweet by tweet-ID match.
+    This avoids the quote-tweet embedding problem where visiting an individual
+    quote-tweet page causes the quoted original's action bar to be read instead
+    of our tweet's action bar.
+    """
+    import sys as _sys, time as _time
+    _sys.path.insert(0, str(Path(__file__).parent / "action"))
+    try:
+        from browser_post import bw, ensure_session
+    except ImportError:
+        print("[db] scrape_engagement: cannot import browser_post, skipping")
+        return
+
+    if not ensure_session():
+        print("[db] scrape_engagement: browser session unavailable")
+        return
 
     c = _conn()
-    rows = c.execute("SELECT id, our_tweet_url FROM posted_tweets WHERE our_tweet_url IS NOT NULL AND our_tweet_url != ''").fetchall()
+    rows = c.execute(
+        "SELECT id, our_tweet_url FROM posted_tweets WHERE our_tweet_url IS NOT NULL AND our_tweet_url != ''"
+    ).fetchall()
     c.close()
     if not rows:
         return
 
+    # Build set of tweet IDs we need
+    # url format: https://x.com/alliiexia/status/TWEET_ID
+    id_to_row = {}
+    for row_id, url in rows:
+        tid = url.rstrip('/').split('/')[-1]
+        id_to_row[tid] = (row_id, url)
+
+    def parse_num(s):
+        if not s: return 0
+        s = str(s).replace(',', '').strip()
+        if s.endswith('K') or s.endswith('k'): return int(float(s[:-1]) * 1000)
+        if s.endswith('M') or s.endswith('m'): return int(float(s[:-1]) * 1_000_000)
+        try: return int(s)
+        except: return 0
+
+    # JS to scrape all visible tweets from the timeline at once.
+    # Each article in the timeline shows ONE tweet (our tweet) — no embedded quotes
+    # in the action bar, because timeline cards don't expand the quoted tweet's buttons.
+    PROFILE_SCRAPE_JS = """(function(){
+        function parseAria(str) {
+            if (!str) return '';
+            var m = str.match(/^([\d,]+(?:\\.\\d+)?[KkMm]?)/);
+            return m ? m[1] : '';
+        }
+        var results = {};
+        var articles = document.querySelectorAll('article[data-testid="tweet"]');
+        articles.forEach(function(art) {
+            // Get tweet ID from the permalink link inside the article
+            var link = art.querySelector('a[href*="/status/"]');
+            if (!link) return;
+            var m = link.href.match(/\\/status\\/(\\d+)/);
+            if (!m) return;
+            var tid = m[1];
+
+            var bar = art.querySelector('[role="group"]');
+            if (!bar) return;
+
+            var groupLabel = bar.getAttribute('aria-label') || '';
+            var viewsMatch = groupLabel.match(/([\\d,]+(?:\\.\\d+)?[KkMm]?)\\s+view/i);
+            var likeBtn = bar.querySelector('[data-testid="like"]');
+            var rtBtn   = bar.querySelector('[data-testid="retweet"]');
+
+            results[tid] = {
+                likes:    likeBtn ? parseAria(likeBtn.getAttribute('aria-label')) : '',
+                retweets: rtBtn   ? parseAria(rtBtn.getAttribute('aria-label'))   : '',
+                views:    viewsMatch ? viewsMatch[1] : ''
+            };
+        });
+        return JSON.stringify(results);
+    })()"""
+
+    now = datetime.now(timezone.utc).isoformat()
+    db = _conn()
+
     try:
-        import httpx, websockets
+        # Navigate to profile with_replies tab — shows all our posts
+        bw("goto", "https://x.com/alliiexia/with_replies", timeout=20)
+        _time.sleep(5)
 
-        async def get_metrics(tweet_url: str) -> dict:
-            # Use CDP to navigate and scrape
-            targets = httpx.get("http://localhost:9222/json").json()
-            if not targets:
-                return {}
-            ws_url = targets[0]["webSocketDebuggerUrl"]
-            async with websockets.connect(ws_url, max_size=10_000_000) as ws:
-                msg_id = [0]
+        # Scroll to load more tweets (up to 3 passes)
+        found = {}
+        for scroll_pass in range(4):
+            result = bw("eval", PROFILE_SCRAPE_JS)
+            raw = result.get("value", "{}")
+            batch = json.loads(raw) if raw else {}
+            found.update(batch)
 
-                async def send(method, params=None):
-                    msg_id[0] += 1
-                    await ws.send(json.dumps({"id": msg_id[0], "method": method, "params": params or {}}))
-                    while True:
-                        resp = json.loads(await asyncio.wait_for(ws.recv(), timeout=10))
-                        if resp.get("id") == msg_id[0]:
-                            return resp.get("result", {})
+            # Check if we have all the IDs we need
+            if all(tid in found for tid in id_to_row):
+                break
 
-                await send("Page.navigate", {"url": tweet_url})
-                await asyncio.sleep(4)
-                result = await send("Runtime.evaluate", {"expression": """(function(){
-                    const getText = sel => { const el = document.querySelector(sel); return el ? el.innerText.trim() : '0'; };
-                    return JSON.stringify({
-                        likes: getText('[data-testid="like"] span[data-testid="app-text-transition-container"]'),
-                        retweets: getText('[data-testid="retweet"] span[data-testid="app-text-transition-container"]'),
-                        views: getText('[data-testid="tweet"] a[href*="/analytics"] span') || getText('[aria-label*="view"]')
-                    });
-                })()""", "returnByValue": True})
-                val = result.get("result", {}).get("value", "{}")
-                return json.loads(val) if val else {}
+            # Scroll down to load more
+            bw("eval", "window.scrollBy(0, 2000)")
+            _time.sleep(3)
 
-        now = datetime.now(timezone.utc).isoformat()
-        db = _conn()
-        for row_id, url in rows:
-            try:
-                m = asyncio.run(get_metrics(url))
-                def parse_num(s):
-                    if not s: return 0
-                    s = str(s).replace(',', '').strip()
-                    if s.endswith('K'): return int(float(s[:-1]) * 1000)
-                    if s.endswith('M'): return int(float(s[:-1]) * 1_000_000)
-                    try: return int(s)
-                    except: return 0
-                db.execute(
-                    "UPDATE posted_tweets SET views=?, retweets=?, likes=?, last_synced=? WHERE id=?",
-                    (parse_num(m.get("views")), parse_num(m.get("retweets")), parse_num(m.get("likes")), now, row_id)
-                )
-                print(f"[db] engagement synced for {url}: {m}")
-            except Exception as e:
-                print(f"[db] engagement scrape failed for {url}: {e}")
+        # Write results to DB
+        for tid, (row_id, url) in id_to_row.items():
+            m = found.get(tid)
+            if not m:
+                print(f"[db] engagement not found in timeline for {url}")
+                continue
+            db.execute(
+                "UPDATE posted_tweets SET views=?, retweets=?, likes=?, last_synced=? WHERE id=?",
+                (parse_num(m.get("views")), parse_num(m.get("retweets")), parse_num(m.get("likes")), now, row_id)
+            )
+            print(f"[db] engagement synced {url}: likes={m.get('likes')} rt={m.get('retweets')} views={m.get('views')}")
+
         db.commit()
-        db.close()
     except Exception as e:
         print(f"[db] scrape_engagement failed: {e}")
+    finally:
+        db.close()
