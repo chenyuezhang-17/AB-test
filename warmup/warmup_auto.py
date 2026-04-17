@@ -1,11 +1,11 @@
 """
-@Leegowlessie 两周养号自动系统
-每天 10:00 自动运行：
-1. 关注 10-15 个 tech/AI/startup 圈子账号
-2. 点赞 20-30 条目标受众推文
-3. 回复 3-5 条（有价值的评论，不推产品）
-4. 转发 2-3 条优质内容
-5. 发 1 条原创推文（科技/求职观察）
+@Leegowlessie 养号自动系统 (Daemon Mode)
+每天 10:00 启动，全天分散执行：
+1. 关注目标受众账号（多圈层混合）
+2. 点赞目标推文（tech + growth + creator + lifestyle）
+3. 回复有价值的评论
+4. 转发优质内容
+5. 发原创推文（6主题轮换）
 """
 
 import sys, os, time, json, sqlite3, datetime, random
@@ -24,39 +24,47 @@ from warmup.content_gen import generate_tweet, get_reply_for_tweet
 DB  = '/Users/lessie/cc/AB-test/activity.db'
 LOG = '/tmp/leegowlessie_warmup.log'
 
-# ─── Seed accounts to mine followers/engagers from ─────────────────────────
+# ─── Multi-category seed accounts ─────────────────────────────────────────
 SEED_ACCOUNTS = [
-    "sama", "naval", "karpathy", "paulg", "ycombinator",
-    "swyx", "bentossell", "levelsio", "shreyas", "emollick",
-    "garrytan", "shl", "hunterwalk", "andrewchen", "patrick_oshag",
+    # Tech/AI
+    "sama", "karpathy", "swyx", "levelsio", "emollick",
+    # Growth/Marketing
+    "randfish", "dharmesh", "lennysan", "Julian", "agazdecki",
+    # Creator/Lifestyle
+    "sahilbloom", "dickiebush", "aliabdaal", "jasonfried", "danmartell",
+    # Hiring/Careers
+    "hunterwalk", "garrytan", "naval", "shreyas", "shl",
 ]
 
-# ─── Search queries for liking & replying ──────────────────────────────────
+# ─── Diversified search queries ───────────────────────────────────────────
 LIKE_QUERIES = [
+    # Tech/Hiring (existing audience)
     "hiring AI engineer 2026 lang:en",
     "open to work software engineer lang:en",
-    "looking for cofounder technical lang:en",
     "AI startup building team lang:en",
-    "tech layoffs job search lang:en",
     "machine learning engineer hiring lang:en",
-    "remote software engineer jobs 2026 lang:en",
-    "AI product manager hiring lang:en",
+    # Growth/Marketing (new audience)
+    "growth marketing strategy 2026 lang:en",
+    "PLG product led growth lang:en",
+    "B2B SaaS marketing lang:en",
+    "content marketing strategy lang:en",
+    # Creator/Lifestyle (new audience)
+    "building in public founder lang:en",
+    "newsletter growth strategy lang:en",
+    "creator economy tools lang:en",
+    "remote work productivity lang:en",
 ]
 
 REPLY_QUERIES = [
     "looking for cofounder technical lang:en",
     "open to work senior engineer lang:en",
     "AI startup hiring engineers lang:en",
-    "job search tech 2026 lang:en",
-    "hiring machine learning lang:en",
-]
-
-# North America location keywords for account filtering
-NA_LOCATIONS = [
-    "us", "usa", "united states", "canada", "sf", "san francisco",
-    "new york", "nyc", "seattle", "austin", "boston", "chicago",
-    "los angeles", "la", "toronto", "vancouver", "bay area",
-    "silicon valley", "new york", "washington", "denver", "miami",
+    # Growth/Marketing
+    "growth marketing tips lang:en",
+    "SaaS founder advice lang:en",
+    # Creator
+    "building in public update lang:en",
+    "newsletter milestone lang:en",
 ]
 
 # ─── Daily limits ──────────────────────────────────────────────────────────
@@ -397,58 +405,90 @@ def run_original_post():
         log(f"✗ post failed: {url}")
 
 
-# ─── Main ──────────────────────────────────────────────────────────────────
+# ─── Daemon helpers ────────────────────────────────────────────────────────
+
+def _time_today(hour, minute=0):
+    return datetime.datetime.combine(datetime.date.today(),
+                                     datetime.time(hour, minute))
+
+def _wait_until(target):
+    while datetime.datetime.now() < target:
+        remaining = (target - datetime.datetime.now()).total_seconds()
+        if remaining <= 0:
+            break
+        time.sleep(min(remaining, 60))
+
+def _reset():
+    """Kill and restart browser session between tasks."""
+    import subprocess as _sp
+    _sp.run(["pkill", "-f", "warmup.session"], capture_output=True)
+    time.sleep(2)
+    for f in ["/tmp/leegowlessie-browser.sock", "/tmp/leegowlessie-browser.pid"]:
+        try: os.remove(f)
+        except: pass
+    if not ensure_session():
+        log("  Failed to restart session")
+        return False
+    log("  Session restarted")
+    return True
+
+
+# ─── Main daemon ──────────────────────────────────────────────────────────
 
 def main():
     today = datetime.date.today().isoformat()
-    log(f"=== Leegowlessie Warmup [{today}] starting ===")
+    log(f"=== Leegowlessie Warmup Daemon [{today}] starting ===")
 
     _init_db()
 
     if not ensure_session():
-        log("✗ Browser session failed to start. Is Leegowlessie Chrome running on port 9223?")
-        log("  Run: /Users/lessie/cc/AB-test/scripts/launch_leegowlessie_browser.sh")
+        log("Browser session failed. Is Leegowlessie Chrome on port 9223?")
+        log("  Run: scripts/launch_leegowlessie_browser.sh")
         return
 
-    log("✓ Browser session ready")
+    log("Browser session ready")
 
-    def _reset():
-        """Kill and restart browser session between tasks to avoid stale connections."""
-        import subprocess as _sp, os as _os
-        _sp.run(["pkill", "-f", "warmup.session"], capture_output=True)
-        time.sleep(2)
-        for f in ["/tmp/leegowlessie-browser.sock", "/tmp/leegowlessie-browser.pid"]:
-            try: _os.remove(f)
-            except: pass
-        if not ensure_session():
-            log("✗ Failed to restart session")
-            return False
-        log("  ↳ Session restarted ✓")
-        return True
+    # Build schedule: spread 5 tasks across 10:00-18:00 with jitter
+    now = datetime.datetime.now()
+    start_hour = max(now.hour + 1, 10)
+    end_hour = 18
 
-    # Run tasks — restart session between each to stay stable
-    log("── Task 1: Follows ──")
-    run_follows()
+    tasks = [
+        ("follows", run_follows),
+        ("likes", run_likes),
+        ("replies", run_replies),
+        ("retweets", run_retweets),
+        ("post", run_original_post),
+    ]
 
-    time.sleep(5); _reset()
+    if start_hour >= end_hour:
+        # Late start — run all now
+        log("Late start — running all tasks now")
+        task_times = [now + datetime.timedelta(seconds=i * 30) for i in range(len(tasks))]
+    else:
+        # Spread across the day
+        span = (end_hour - start_hour) * 60
+        slot = span / len(tasks)
+        task_times = []
+        for i in range(len(tasks)):
+            offset = int(i * slot) + random.randint(0, max(0, int(slot) - 1))
+            task_times.append(_time_today(start_hour) + datetime.timedelta(minutes=offset))
 
-    log("── Task 2: Likes ──")
-    run_likes()
+    # Execute schedule
+    for (task_name, task_fn), target_time in zip(tasks, task_times):
+        if target_time > datetime.datetime.now():
+            wait_min = (target_time - datetime.datetime.now()).total_seconds() / 60
+            log(f"Next: {task_name} at {target_time.strftime('%H:%M')} ({int(wait_min)}min away)")
+            _wait_until(target_time)
 
-    time.sleep(5); _reset()
+        log(f"── {task_name.title()} ──")
+        try:
+            task_fn()
+        except Exception as e:
+            log(f"  {task_name} failed: {e}")
 
-    log("── Task 3: Replies ──")
-    run_replies()
-
-    time.sleep(5); _reset()
-
-    log("── Task 4: Retweets ──")
-    run_retweets()
-
-    time.sleep(5); _reset()
-
-    log("── Task 5: Original Post ──")
-    run_original_post()
+        time.sleep(5)
+        _reset()
 
     # Summary
     conn = sqlite3.connect(DB)

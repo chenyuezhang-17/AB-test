@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.lessie.leego-daily</string>
+
+    <key>ProgramArguments</key>
+    <array>
+        <string>/bin/bash</string>
+        <string>/Users/lessie/cc/AB-test/scripts/run_daily.sh</string>
+    </array>
+
+    <!-- Run at 9:05 AM every day -->
+    <key>StartCalendarInterval</key>
+    <dict>
+        <key>Hour</key>
+        <integer>9</integer>
+        <key>Minute</key>
+        <integer>5</integer>
+    </dict>
+
+    <key>StandardOutPath</key>
+    <string>/tmp/lessie_daily_launchd.log</string>
+    <key>StandardErrorPath</key>
+    <string>/tmp/lessie_daily_launchd.log</string>
+
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>HOME</key>
+        <string>/Users/lessie</string>
+        <key>PATH</key>
+        <string>/Users/lessie/.local/bin:/Users/lessie/.nvm/versions/node/v24.14.1/bin:/usr/local/bin:/usr/bin:/bin</string>
+    </dict>
+
+    <!-- Don't restart if it crashes — wait for next day -->
+    <key>KeepAlive</key>
+    <false/>
+
+    <!-- Allow up to 14 hours runtime (daemon runs all day) -->
+    <key>TimeOut</key>
+    <integer>50400</integer>
+</dict>
+</plist>

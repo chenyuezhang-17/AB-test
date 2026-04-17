@@ -1,13 +1,11 @@
 """
-Lessie Twitter 全自动日更系统
-每天9:00自动启动，全天无人值守运行：
-1. 扫描今日热词 (S1候选)
-2. 分析昨日互动，学习优化
-3. 每2小时发1条（2 S1 + 3 S2），共5条
-4. 收盘后抓取互动数据
-5. 写入学习日志供下次优化
+Lessie Twitter 全自动日更系统 (Daemon Mode)
+每天9:00自动启动，全天分散执行，晚上收盘分析：
+1. 早上：读策略记忆 + 扫描热词 + 分析昨日数据
+2. 全天：每2小时发1条（随机抖动），KOL互动穿插在帖子间隙
+3. 晚上：抓取互动数据 + 运行学习系统更新策略记忆
 """
-import sys, os, time, json, sqlite3, datetime, subprocess
+import sys, os, time, json, sqlite3, datetime, subprocess, random
 sys.path.insert(0, '/Users/lessie/cc/AB-test')
 
 from dotenv import load_dotenv
@@ -18,11 +16,14 @@ from bridge.search import _create_share_link, _build_search_prompt
 from db_log import log_action, scrape_engagement
 from scanner.trends import scan_trends
 from db_log import save_trend_candidates, get_trend_candidates
+from learn import load_strategy, load_kol_strategy, update_all_strategies
 
 DB      = '/Users/lessie/cc/AB-test/activity.db'
 LOG     = '/tmp/lessie_daily.log'
 DAILY_LIMIT = 5
-POST_INTERVAL = 0  # no wait between posts
+
+# Strategy context — loaded at startup, refreshed after learning
+_strategy_ctx = ""
 
 # ─── logging ───────────────────────────────────────────────────────────────
 
@@ -254,7 +255,14 @@ def _generate_s2_reply(tweet_text: str, author: str, intent: str, checkpoint: st
 
     Returns the reply text, or None if generation fails (caller should skip this tweet).
     """
+    # Load intent-specific strategy memory
+    strategy = load_strategy(intent=intent, account="alliiexia")
+    strategy_block = ""
+    if strategy:
+        strategy_block = f"\n--- STRATEGY (from past performance) ---\n{strategy[:600]}\n---\n\n"
+
     prompt = (
+        f"{strategy_block}"
         f"Original tweet by @{author} ({intent}):\n\"{tweet_text[:400]}\"\n\n"
         f"Search that was run: {checkpoint[:200]}\n\n"
         f"Write the reply:"
@@ -340,35 +348,63 @@ def post_s2(row):
 
 # ─── KOL engagement ────────────────────────────────────────────────────────
 
-# Seed KOL accounts — always in the pool, supplemented by dynamic discovery
-KOL_SEED_ACCOUNTS = [
-    "thisiskp_", "swyx", "levelsio", "bentossell", "naval",
-    "shreyas", "paulg", "garrytan", "andrewchen", "emollick",
-    "karpathy", "sama", "hunterwalk", "lennysan", "shl",
-]
-
-# Search queries to discover new KOL accounts each run
-KOL_DISCOVERY_QUERIES = [
-    "AI founder", "startup builder", "ML researcher",
-    "tech investor", "SaaS founder", "product engineer",
-]
+# Multi-pool KOL config — each category has seeds + discovery queries + weight
+KOL_POOLS = {
+    "tech": {
+        "seeds": ["karpathy", "swyx", "levelsio", "emollick", "sama"],
+        "queries": ["AI founder", "ML researcher", "startup builder"],
+        "weight": 0.30,
+    },
+    "growth": {
+        "seeds": ["randfish", "dharmesh", "Julian", "lennysan", "agazdecki"],
+        "queries": ["growth marketing SaaS", "PLG strategy", "B2B growth leader"],
+        "weight": 0.25,
+    },
+    "creator": {
+        "seeds": ["sahilbloom", "dickiebush", "aliabdaal", "danmartell", "jasonfried"],
+        "queries": ["creator economy", "newsletter growth", "building in public"],
+        "weight": 0.20,
+    },
+    "hiring": {
+        "seeds": ["hunterwalk", "garrytan", "naval", "shreyas", "shl"],
+        "queries": ["hiring manager startup", "talent acquisition tech", "recruiter AI"],
+        "weight": 0.15,
+    },
+    "lifestyle": {
+        "seeds": ["paulg", "patrick_oshag", "andrewchen", "bentossell", "thisiskp_"],
+        "queries": ["remote work founder", "founder life balance", "tech career advice"],
+        "weight": 0.10,
+    },
+}
 
 DAILY_KOL_LIKES   = 3    # likes across KOL timeline
 DAILY_KOL_REPLIES = 15   # value-add replies to KOL posts
 
 
 def _discover_kol_accounts():
-    """Discover KOL accounts dynamically via Twitter user search.
+    """Discover KOL accounts from multi-pool config + dynamic search.
 
-    Runs 2 random search queries, collects usernames from results,
-    merges with seed list. Returns a deduplicated list.
+    Weighted sampling: pick categories by weight, use seeds + search.
+    Returns list of (username, category) tuples.
     """
-    import random as _random
-    candidates = list(KOL_SEED_ACCOUNTS)
-    seen = set(KOL_SEED_ACCOUNTS)
+    categories = list(KOL_POOLS.keys())
+    weights = [KOL_POOLS[c]["weight"] for c in categories]
+    picked = set()
+    while len(picked) < min(4, len(categories)):
+        choice = random.choices(categories, weights=weights, k=1)[0]
+        picked.add(choice)
 
-    queries = _random.sample(KOL_DISCOVERY_QUERIES, 2)
-    for query in queries:
+    candidates = []  # (username, category)
+    seen = set()
+
+    for cat in picked:
+        pool = KOL_POOLS[cat]
+        for u in pool["seeds"]:
+            if u not in seen:
+                seen.add(u)
+                candidates.append((u, cat))
+        # Dynamic discovery: 1 search query per category
+        query = random.choice(pool["queries"])
         encoded = query.replace(" ", "%20")
         _bw_alliiexia("goto", f"https://x.com/search?q={encoded}&f=user", timeout=20)
         time.sleep(3)
@@ -392,19 +428,20 @@ def _discover_kol_accounts():
         for u in found:
             if u not in seen:
                 seen.add(u)
-                candidates.append(u)
-        log(f"  [kol discover] '{query}' → {len(found)} accounts found")
+                candidates.append((u, cat))
+        log(f"  [kol discover] [{cat}] '{query}' -> {len(found)} found")
 
     return candidates
 
 KOL_REPLY_PROMPT = """You write short, sharp replies for @alliiexia (Leego, a people search tool).
 
 Rules:
-- Sound like a smart tech insider, NOT a product pitch
+- Sound like a smart insider who fits the conversation, NOT a product pitch
 - Add a SPECIFIC observation, data point, or extension of the thought
+- Adapt your tone to the topic: tech=analytical, growth=metrics-driven, creator=practical, lifestyle=relatable
 - Do NOT mention Leego, search, or any product
 - Under 180 chars
-- English only, casual Silicon Valley tone
+- English only, casual tone
 - No hashtags, max 1 emoji
 - Don't start with "Great point" or "Totally agree"
 - Don't start with "I"
@@ -438,10 +475,16 @@ def _read_full_tweet(tweet_url: str) -> str:
     return (result.get("value") or "").strip()
 
 
-def _generate_kol_reply(tweet_text: str, author: str):
+def _generate_kol_reply(tweet_text: str, author: str, category: str = "tech"):
     """Generate a value-add reply to a KOL tweet. Returns text or None."""
+    strategy = load_kol_strategy(category=category, account="alliiexia")
+    strategy_block = ""
+    if strategy:
+        strategy_block = f"--- STRATEGY ({category}) ---\n{strategy[:400]}\n---\n\n"
+
     prompt = (
-        f'Tweet by @{author}:\n"{tweet_text[:350]}"\n\n'
+        f'{strategy_block}'
+        f'Tweet by @{author} (category: {category}):\n"{tweet_text[:350]}"\n\n'
         f'Write a sharp, value-add reply:'
     )
     claude_bin = (
@@ -468,21 +511,20 @@ def _generate_kol_reply(tweet_text: str, author: str):
 
 def engage_kol():
     """Like and reply to KOL content from @alliiexia browser session."""
-    import random as _random
     log("── KOL Engagement ──")
     ensure_browser()
 
-    # Discover KOL accounts dynamically (seeds + search results)
+    # Discover KOL accounts from multi-pool (returns (username, category) tuples)
     all_kols = _discover_kol_accounts()
-    targets = _random.sample(all_kols, min(8, len(all_kols)))
+    targets = random.sample(all_kols, min(8, len(all_kols)))
     liked_total = 0
     replied_total = 0
 
-    for username in targets:
+    for username, kol_category in targets:
         if liked_total >= DAILY_KOL_LIKES and replied_total >= DAILY_KOL_REPLIES:
             break
 
-        log(f"  Visiting @{username}...")
+        log(f"  Visiting @{username} [{kol_category}]...")
         _bw_alliiexia("goto", f"https://x.com/{username}", timeout=20)
         time.sleep(3)
 
@@ -558,8 +600,8 @@ def engage_kol():
             if not full_text or len(full_text) < 15:
                 log(f"  ✗ couldn't read @{tweet['author']} tweet, skipping")
                 continue
-            log(f"  Generating reply for @{tweet['author']}: '{full_text[:80]}'...")
-            reply = _generate_kol_reply(full_text, tweet["author"])
+            log(f"  Generating reply for @{tweet['author']} [{kol_category}]: '{full_text[:80]}'...")
+            reply = _generate_kol_reply(full_text, tweet["author"], category=kol_category)
             if reply:
                 log(f"  Reply: '{reply[:90]}'")
                 # Already on tweet page — click reply button
@@ -633,30 +675,69 @@ def engage_kol():
             else:
                 log("  ✗ reply generation failed, skipping")
 
-        time.sleep(_random.uniform(5, 10))
+        time.sleep(random.uniform(5, 10))
 
     log(f"KOL: liked {liked_total} · replied {replied_total}")
 
 
-# ─── main daily loop ───────────────────────────────────────────────────────
+# ─── daemon helpers ────────────────────────────────────────────────────────
+
+def _time_today(hour, minute=0):
+    """Create a datetime for today at the given hour:minute."""
+    return datetime.datetime.combine(datetime.date.today(),
+                                     datetime.time(hour, minute))
+
+def _wait_until(target):
+    """Sleep until target datetime, checking every 60s."""
+    while datetime.datetime.now() < target:
+        remaining = (target - datetime.datetime.now()).total_seconds()
+        if remaining <= 0:
+            break
+        time.sleep(min(remaining, 60))
+
+def _spread_times(n, start_hour, end_hour):
+    """Generate n random times spread between start_hour and end_hour."""
+    if n <= 0:
+        return []
+    span_minutes = (end_hour - start_hour) * 60
+    if span_minutes <= 0 or n > span_minutes:
+        return [_time_today(start_hour, i * 5) for i in range(n)]
+    # Divide into n equal slots, pick a random point in each slot
+    slot_size = span_minutes / n
+    times = []
+    for i in range(n):
+        slot_start = int(i * slot_size)
+        slot_end = int((i + 1) * slot_size)
+        offset = random.randint(slot_start, max(slot_start, slot_end - 1))
+        times.append(_time_today(start_hour) + datetime.timedelta(minutes=offset))
+    return times
+
+
+# ─── main daemon ──────────────────────────────────────────────────────────
 
 def main():
+    global _strategy_ctx
     today = datetime.date.today().isoformat()
-    log(f"=== Lessie Daily Auto [{today}] starting ===")
+    log(f"=== Leego Daily Daemon [{today}] starting ===")
 
-    # 1. Learn from yesterday
+    # ── Phase 1: Morning prep ──
+    _strategy_ctx = load_strategy(account="alliiexia")
+    if _strategy_ctx:
+        log(f"Strategy loaded ({len(_strategy_ctx)} chars)")
+    else:
+        log("No strategy file yet — running without memory")
+
     learn_from_yesterday()
 
-    # 2. Scan fresh trends (S1 pool) — skip if we already have today's trends
+    # Scan trends
     conn_check = sqlite3.connect(DB)
     existing_trends = conn_check.execute(
         "SELECT count(*) FROM trend_candidates WHERE scanned_at LIKE ? AND status='pending'",
         (f"{today}%",)
     ).fetchone()[0]
     conn_check.close()
-
     if existing_trends >= 5:
-        log(f"Trends: {existing_trends} pending already scanned today, skipping re-scan")
+        log(f"Trends: {existing_trends} pending, skipping re-scan")
     else:
         log("Scanning today's trending topics...")
         try:
@@ -666,92 +747,123 @@ def main():
         except Exception as e:
             log(f"Trend scan failed: {e}")
 
-    # 3. Build today's post plan (2 S1 + 3 S2, interleaved)
-    # Fetch extra S2 backups (up to 10) so we can auto-retry on deleted tweets
+    # ── Phase 2: Build post plan ──
     s1_picks = pick_s1_candidates(n=2)
-    s2_picks = pick_s2_candidates(n=10)   # extra buffer
-    s2_queue = list(s2_picks)             # mutable backup pool
+    s2_picks = pick_s2_candidates(n=10)
+    s2_queue = list(s2_picks)
 
-    log(f"Candidates: {len(s1_picks)} S1, {len(s2_queue)} S2 in pool (target 3)")
-
-    if not s1_picks and not s2_queue:
-        log("No candidates available today. Exiting.")
-        return
-
-    # Interleave: S2, S1, S2, S1, S2 (use first 3 S2 + 2 S1 for plan)
     plan = []
     s1 = list(s1_picks)
-    s2_plan = s2_queue[:3]; s2_queue = s2_queue[3:]  # reserve rest as backups
+    s2_plan = s2_queue[:3]
+    s2_queue = s2_queue[3:]
     s2 = list(s2_plan)
     while s1 or s2:
         if s2: plan.append(('s2', s2.pop(0)))
         if s1: plan.append(('s1', s1.pop(0)))
     plan = plan[:DAILY_LIMIT]
 
-    # 4. Post on schedule
+    log(f"Plan: {len(plan)} posts, {len(s2_queue)} S2 backups")
+
+    # ── Phase 3: Build daily schedule ──
+    now = datetime.datetime.now()
+    start_hour = max(now.hour + 1, 10)  # earliest: 10am or next hour
+    end_hour = 20                        # latest post: 8pm
+
+    if start_hour >= end_hour:
+        # Too late — run everything immediately (burst mode fallback)
+        log("Late start — posting all now (burst mode)")
+        post_times = [now + datetime.timedelta(seconds=i * 30) for i in range(len(plan))]
+    else:
+        post_times = _spread_times(len(plan), start_hour, end_hour)
+
+    # KOL engagement: 3 sessions spread between posts
+    kol_start = max(start_hour, 11)
+    kol_end = min(end_hour + 1, 21)
+    kol_times = _spread_times(3, kol_start, kol_end) if kol_start < kol_end else []
+
+    # Merge into unified schedule: [(time, type, data), ...]
+    events = []
+    for i, (stype, row) in enumerate(plan):
+        t = post_times[i] if i < len(post_times) else now
+        events.append((t, "post", (stype, row)))
+    for t in kol_times:
+        events.append((t, "kol", None))
+    events.sort(key=lambda e: e[0])
+
+    log(f"Schedule: {len(events)} events from {events[0][0].strftime('%H:%M') if events else '?'} "
+        f"to {events[-1][0].strftime('%H:%M') if events else '?'}")
+
+    # ── Phase 4: Execute schedule ──
     posted_count = 0
-    sleep_before_next = False   # True after every successful post
-    i = 0
-    while i < len(plan) and posted_count < DAILY_LIMIT:
-        stype, row = plan[i]
+    for target_time, event_type, data in events:
+        # Wait until scheduled time
+        if target_time > datetime.datetime.now():
+            wait_min = (target_time - datetime.datetime.now()).total_seconds() / 60
+            log(f"Next: {event_type} at {target_time.strftime('%H:%M')} ({int(wait_min)}min away)")
+            _wait_until(target_time)
 
-        # Only sleep between successful posts (not after a failed/skipped one)
-        if sleep_before_next:
-            log(f"⏳ Waiting {POST_INTERVAL//60} min until next post...")
-            time.sleep(POST_INTERVAL)
-            sleep_before_next = False
+        if event_type == "post":
+            if posted_count >= DAILY_LIMIT:
+                continue
+            # Re-check daily limit against DB
+            conn = sqlite3.connect(DB)
+            n_today = conn.execute(
+                "SELECT COUNT(*) FROM posted_tweets WHERE posted_at LIKE ? AND scene != 'KOL Engagement'",
+                (f"{today}%",)
+            ).fetchone()[0]
+            conn.close()
+            if n_today >= DAILY_LIMIT:
+                log("Daily limit reached in DB. Skipping remaining posts.")
+                continue
 
-        # Re-check daily limit against DB (in case of external posts)
-        # Exclude KOL Engagement entries — those don't count toward the daily post limit
-        conn = sqlite3.connect(DB)
-        n_today = conn.execute(
-            "SELECT COUNT(*) FROM posted_tweets WHERE posted_at LIKE ? AND scene != 'KOL Engagement'",
-            (f"{today}%",)
-        ).fetchone()[0]
-        conn.close()
-        if n_today >= DAILY_LIMIT:
-            log("Daily limit reached. Stopping.")
-            break
+            stype, row = data
+            log(f"--- Post {posted_count+1}/{DAILY_LIMIT}: {stype.upper()} ---")
+            ensure_browser()
 
-        log(f"--- Post {posted_count+1}/{DAILY_LIMIT}: {stype.upper()} ---")
-
-        if stype == 's1':
-            success = post_s1(row)
-            posted_count += 1   # S1 always counts (even if it failed, don't retry)
-            sleep_before_next = True
-            i += 1
-        else:
-            result = post_s2(row)
-            if result == "ok":
+            if stype == 's1':
+                post_s1(row)
                 posted_count += 1
-                sleep_before_next = True
-                i += 1
             else:
-                # Tweet gone — swap in next backup immediately, no sleep
-                if s2_queue:
+                result = post_s2(row)
+                if result == "ok":
+                    posted_count += 1
+                elif s2_queue:
                     backup = s2_queue.pop(0)
-                    log(f"  ↳ Swapping in backup: @{backup[1]} [{backup[3]}]")
-                    plan[i] = ('s2', backup)
-                    # i stays the same → retry this slot with the new candidate
-                else:
-                    log("  ↳ No more S2 backups available, skipping slot")
-                    i += 1
+                    log(f"  Swapping backup: @{backup[1]}")
+                    result2 = post_s2(backup)
+                    if result2 == "ok":
+                        posted_count += 1
 
-    # 5. Engage with KOL content (likes + replies)
-    try:
-        engage_kol()
-    except Exception as e:
-        log(f"KOL engagement failed: {e}")
+        elif event_type == "kol":
+            log("--- KOL Engagement ---")
+            try:
+                ensure_browser()
+                engage_kol()
+            except Exception as e:
+                log(f"KOL failed: {e}")
 
-    # 6. Scrape engagement
+    # ── Phase 5: Evening wrap-up ──
+    wrap_time = _time_today(21, 0)
+    if datetime.datetime.now() < wrap_time:
+        log(f"Waiting for wrap-up at 21:00...")
+        _wait_until(wrap_time)
+
     log("Scraping engagement data...")
     try:
+        ensure_browser()
         scrape_engagement()
-        log("Engagement updated ✓")
+        log("Engagement updated")
     except Exception as e:
         log(f"Engagement scrape failed: {e}")
 
-    log(f"=== Daily auto complete [{today}] ===")
+    log("Updating strategy memory...")
+    try:
+        update_all_strategies()
+        log("Strategy updated")
+    except Exception as e:
+        log(f"Strategy update failed: {e}")
+
+    log(f"=== Daily daemon [{today}] finished ===")
 
 if __name__ == "__main__":
     main()

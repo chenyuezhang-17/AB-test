@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.lessie.leego-warmup</string>
+
+    <key>ProgramArguments</key>
+    <array>
+        <string>/bin/bash</string>
+        <string>/Users/lessie/cc/AB-test/scripts/run_warmup.sh</string>
+    </array>
+
+    <!-- Run at 10:00 AM every day -->
+    <key>StartCalendarInterval</key>
+    <dict>
+        <key>Hour</key>
+        <integer>10</integer>
+        <key>Minute</key>
+        <integer>0</integer>
+    </dict>
+
+    <key>StandardOutPath</key>
+    <string>/tmp/leegowlessie_warmup_launchd.log</string>
+    <key>StandardErrorPath</key>
+    <string>/tmp/leegowlessie_warmup_launchd.log</string>
+
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>HOME</key>
+        <string>/Users/lessie</string>
+        <key>PATH</key>
+        <string>/Users/lessie/.local/bin:/Users/lessie/.nvm/versions/node/v24.14.1/bin:/usr/local/bin:/usr/bin:/bin</string>
+    </dict>
+
+    <key>KeepAlive</key>
+    <false/>
+
+    <!-- Allow up to 10 hours runtime -->
+    <key>TimeOut</key>
+    <integer>36000</integer>
+</dict>
+</plist>

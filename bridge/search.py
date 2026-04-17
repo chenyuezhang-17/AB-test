@@ -74,7 +74,33 @@ def _build_search_prompt(tweet_text: str, author: str = "") -> str:
 
 
 def _create_share_link(checkpoint: str) -> str | None:
-    """Create a Lessie web conversation and return a public share link.
+    """Create a Lessie share link. Tries JWT first, then CDP as fallback.
+
+    Two independent methods — if one fails, the other takes over:
+    1. JWT (fast, pure HTTP) — expires every ~7 days
+    2. CDP (browser cookies) — always fresh if Chrome is logged in
+    """
+    # Method 1: JWT (fast, no browser session needed)
+    url = _create_share_link_jwt(checkpoint)
+    if url:
+        return url
+
+    # Method 2: CDP fallback (uses browser's auth cookies)
+    print("[bridge] JWT failed, trying CDP fallback...")
+    try:
+        from bridge.share_cdp import create_share_link_cdp
+        url = create_share_link_cdp(checkpoint)
+        if url:
+            return url
+    except Exception as e:
+        print(f"[bridge] CDP fallback error: {e}")
+
+    print("[bridge] Both JWT and CDP methods failed")
+    return None
+
+
+def _create_share_link_jwt(checkpoint: str) -> str | None:
+    """Create share link via Lessie Web API using JWT token.
 
     1. POST to chat/stream with the search query → get conversation_id
     2. POST to shares/v1 → get share_id

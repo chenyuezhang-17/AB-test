@@ -1,9 +1,12 @@
 """Generate original tweet content for @Leegowlessie warmup.
 
-Rotates through 3 themes:
+Rotates through 6 themes (expanded from 3):
   A) Tech/AI knowhow — data-driven insight or trend
   B) Job market — job seeker pain points / market observations
-  C) People search lens — talent supply/demand observation (no product pitch)
+  C) Talent & people — who's building, who's hiring
+  D) Growth & marketing — PLG, distribution, GTM observations
+  E) Creator economy — newsletters, personal brand, content strategy
+  F) Founder life — building, fundraising, remote work, lessons learned
 """
 from __future__ import annotations
 
@@ -11,19 +14,26 @@ import os
 import subprocess
 import sqlite3
 import datetime
+import random
 from pathlib import Path
+import sys
+sys.path.insert(0, str(Path(__file__).parent.parent))
+from learn import load_warmup_strategy
 
 DB = '/Users/lessie/cc/AB-test/activity.db'
 
-SYSTEM_PROMPT = """You write original tweets for @Leegowlessie — a tech/AI insider account.
+SYSTEM_PROMPT = """You write original tweets for @Leegowlessie — a sharp insider account.
 
-Persona: sharp, data-aware, speaks from experience. No product pitches, no ads.
-Audience: tech founders, engineers, job seekers, hiring managers.
+Persona: data-aware, speaks from experience, wide range of interests. No product pitches, no ads.
+Audience: tech founders, growth marketers, creators, engineers, job seekers.
 
-Three rotating themes (pick whichever fits best given today's context):
-A) Tech/AI knowhow: a specific, non-obvious insight about AI/tech trends, tools, or the industry
-B) Job market: a real observation about the job search experience or hiring market in 2026
-C) Talent & people: an observation about the human side of tech — who's building, who's hiring, who's not
+Six themes (the prompt will tell you which to focus on):
+A) Tech/AI knowhow: a specific, non-obvious insight about AI/tech trends
+B) Job market: a real observation about the hiring market in 2026
+C) Talent & people: the human side of tech — who's building, who's hiring
+D) Growth & marketing: PLG, distribution, GTM, SaaS metrics, content strategy
+E) Creator economy: newsletters, personal brand, YouTube/podcast, creator tools
+F) Founder life: building in public, fundraising, remote work, hard-won lessons
 
 Rules:
 - English only
@@ -37,27 +47,43 @@ Rules:
 GOOD examples:
 - "most senior engineers who got laid off in 2025 are still job hunting in April 2026. the market absorbed juniors faster. counterintuitive."
 - "LLM context windows hit 1M tokens and people are still feeding them the wrong data. the bottleneck shifted from size to curation."
-- "every AI startup that raised in 2024 is now either profitable or quietly running out of runway. the middle ground is gone."
-- "job boards are full. cold outreach is noise. the people getting hired are getting referred. networks > applications in 2026."
+- "every newsletter that hit 100k subscribers in 2025 did it through one channel: Twitter/X replies. not SEO, not paid, not cross-promo."
+- "the best growth hires I've seen this year don't come from growth roles. they come from product, data, or content. title mismatch = opportunity."
+- "building in public used to be a flex. now it's a funnel. the founders getting traction are the ones who document before they monetize."
 
 Output: just the tweet text. No quotes, no commentary."""
 
 
+THEMES = {
+    "A": "Focus on theme A: Tech/AI knowhow — a specific, data-backed insight about AI or tech right now.",
+    "B": "Focus on theme B: Job market — a sharp observation about hiring or job seeking in 2026.",
+    "C": "Focus on theme C: Talent & people — an insight about who's building things or how talent is shifting.",
+    "D": "Focus on theme D: Growth & marketing — a PLG, distribution, or GTM observation from the trenches.",
+    "E": "Focus on theme E: Creator economy — newsletters, personal brand, or content strategy insight.",
+    "F": "Focus on theme F: Founder life — building, fundraising, remote work, or a hard-won lesson.",
+}
+
+
 def _get_theme_for_today() -> str:
-    """Rotate A/B/C based on day of year."""
-    day = datetime.date.today().toordinal()
-    return ["A", "B", "C"][day % 3]
+    """Pick theme: weighted random (strategy can influence) instead of rigid rotation."""
+    # Default weights (equal for new themes, slightly favor established ones)
+    weights = {"A": 2, "B": 2, "C": 2, "D": 1.5, "E": 1.5, "F": 1.5}
+    keys = list(weights.keys())
+    w = [weights[k] for k in keys]
+    return random.choices(keys, weights=w, k=1)[0]
 
 
 def generate_tweet() -> str | None:
     """Generate one original tweet. Returns text or None on failure."""
     theme = _get_theme_for_today()
-    theme_hints = {
-        "A": "Focus on theme A: Tech/AI knowhow — a specific, data-backed insight about AI or tech right now.",
-        "B": "Focus on theme B: Job market — a sharp observation about hiring or job seeking in 2026.",
-        "C": "Focus on theme C: Talent & people — an insight about who's building things or how the talent landscape is shifting.",
-    }
-    prompt = f"Today's theme: {theme_hints[theme]}\n\nWrite one tweet."
+
+    # Load strategy memory for context
+    strategy = load_warmup_strategy(topic="content")
+    strategy_block = ""
+    if strategy:
+        strategy_block = f"\n--- STRATEGY (from past performance) ---\n{strategy[:500]}\n---\n\n"
+
+    prompt = f"{strategy_block}Today's theme: {THEMES[theme]}\n\nWrite one tweet."
 
     claude_bin = (
         "/Users/lessie/.local/bin/claude"
@@ -103,7 +129,11 @@ Rules:
 
 Output: just the reply text."""
 
-    prompt = f'Tweet by @{author}:\n"{tweet_text[:300]}"\n\nWrite a value-add reply:'
+    strategy = load_warmup_strategy(topic="engagement")
+    strategy_block = ""
+    if strategy:
+        strategy_block = f"--- STRATEGY ---\n{strategy[:400]}\n---\n\n"
+    prompt = f'{strategy_block}Tweet by @{author}:\n"{tweet_text[:300]}"\n\nWrite a value-add reply:'
     claude_bin = (
         "/Users/lessie/.local/bin/claude"
         if os.path.exists("/Users/lessie/.local/bin/claude")
