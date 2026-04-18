@@ -296,30 +296,50 @@ def post_quote_browser(tweet_url: str, text: str) -> tuple[bool, str]:
             break
         time.sleep(1)
 
-    # CRITICAL: insert text AND click Post in a single JS call — no sleep in between.
-    # Any delay gives React time to re-render and wipe the text before submit.
-    full_text = text  # tweet_url already embedded as quote card by Twitter
-    result = bw("eval", f"""(function(){{
-        const el = document.querySelector('[data-testid="tweetTextarea_0"][role="textbox"]');
-        if (!el) return 'no_textarea';
-        el.click(); el.focus();
-        document.execCommand('selectAll');
-        document.execCommand('insertText', false, {json.dumps(full_text)});
-        // Click Post immediately — no waiting
+    # Insert text with verification — do NOT click Post until text is confirmed present.
+    # execCommand('insertText') can silently fail in React modals.
+    full_text = text
+    copy_anchor = full_text[:30].replace("\n", " ").strip()
+
+    inserted = False
+    for _attempt in range(3):
+        bw("eval", f"""(function(){{
+            const el = document.querySelector('[data-testid="tweetTextarea_0"][role="textbox"]');
+            if (!el) return 'no_textarea';
+            el.click(); el.focus();
+            document.execCommand('selectAll');
+            document.execCommand('insertText', false, {json.dumps(full_text)});
+        }})()""", timeout=15)
+        time.sleep(0.5)
+
+        # Verify text actually got inserted
+        verify = bw("eval", f"""(function(){{
+            const el = document.querySelector('[data-testid="tweetTextarea_0"][role="textbox"]');
+            if (!el) return 'no_el';
+            const txt = el.innerText || '';
+            return txt.includes({json.dumps(copy_anchor[:20])}) ? 'ok' : 'missing';
+        }})()""", timeout=8)
+        if verify.get("value") == "ok":
+            inserted = True
+            break
+        time.sleep(1)
+
+    if not inserted:
+        return False, "text insert verify failed after 3 attempts — NOT posting"
+
+    # Now click Post (text is confirmed present)
+    time.sleep(0.5)
+    click = bw("eval", """(function(){
         const btn = document.querySelector('[data-testid="tweetButton"]')
             || document.querySelector('[data-testid="tweetButtonInline"]');
         if (!btn) return 'no_btn';
         if (btn.getAttribute('aria-disabled') === 'true') return 'btn_disabled';
-        btn.click();
-        return 'submitted';
-    }})()""", timeout=15)
+        btn.click(); return 'clicked';
+    })()""")
 
-    val = result.get("value", "")
-    if val not in ("submitted", "btn_disabled"):
-        return False, f"quote submit failed: {val}"
-
-    # If button was disabled (React not ready yet), wait briefly and retry once
+    val = click.get("value", "")
     if val == "btn_disabled":
+        # React might need a moment to enable the button after text insert
         time.sleep(1.5)
         retry = bw("eval", """(function(){
             const btn = document.querySelector('[data-testid="tweetButton"]')
@@ -329,7 +349,9 @@ def post_quote_browser(tweet_url: str, text: str) -> tuple[bool, str]:
             btn.click(); return 'clicked';
         })()""")
         if retry.get("value") not in ("clicked",):
-            return False, f"retry click failed: {retry.get('value')}"
+            return False, f"post btn still disabled after text verified — NOT posting"
+    elif val != "clicked":
+        return False, f"post btn failed: {val}"
 
     time.sleep(3)
     tweet_link = _get_latest_tweet_url()

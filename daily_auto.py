@@ -204,7 +204,10 @@ def post_s1(row):
     tid, topic, hook, search_prompt = row
     checkpoint = search_prompt or f"Find professionals relevant to: {topic}"
     log(f"S1 checkpoint: {checkpoint[:100]}")
-    share_url = _create_share_link(checkpoint) or "https://lessie.ai"
+    share_url = _create_share_link(checkpoint)
+    if not share_url:
+        log(f"S1 ✗ share link failed, skipping (won't post homepage link)")
+        return False
     tweet_text = f"{hook}\n\n{share_url}"
     log(f"S1 posting: {tweet_text[:90]}...")
     ensure_browser()
@@ -318,7 +321,10 @@ def post_s2(row):
     tweet_url = f"https://x.com/{author}/status/{tweet_id}"
     checkpoint = _build_search_prompt(tweet_text_raw, author)
     log(f"S2 checkpoint: {checkpoint[:100]}")
-    share_url = _create_share_link(checkpoint) or "https://lessie.ai"
+    share_url = _create_share_link(checkpoint)
+    if not share_url:
+        log(f"S2 ✗ @{author} — share link creation failed, skipping (won't post homepage link)")
+        return "error"
     reply_text = _generate_s2_reply(tweet_text_raw, author, intent, checkpoint)
     if reply_text is None:
         log(f"S2 ✗ @{author} — reply generation failed, skipping to next candidate")
