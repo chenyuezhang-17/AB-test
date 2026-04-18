@@ -570,12 +570,20 @@ def engage_kol():
         })()""")
         tweets = result.get("value") or []
 
-        # Like 1 tweet per KOL visit
+        # Like 1 tweet per KOL visit — skip tweets by @alliiexia (self-like prevention)
         likes_here = 0
         if liked_total < DAILY_KOL_LIKES:
             like_res = _bw_alliiexia("eval", """(function(){
-                const btns = document.querySelectorAll('[data-testid="like"]');
-                for (const btn of btns) {
+                const articles = document.querySelectorAll('article[data-testid="tweet"]');
+                for (const article of articles) {
+                    // Check tweet author — skip if it's our own account
+                    const userEl = article.querySelector('[data-testid="User-Name"] a');
+                    if (userEl) {
+                        const m = userEl.href.match(/x\\.com\\/([^/]+)/);
+                        if (m && m[1].toLowerCase() === 'alliiexia') continue;
+                    }
+                    const btn = article.querySelector('[data-testid="like"]');
+                    if (!btn) continue;
                     const label = btn.getAttribute('aria-label') || '';
                     if (!label.toLowerCase().includes('liked')) { btn.click(); return 1; }
                 }

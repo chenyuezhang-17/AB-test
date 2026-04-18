@@ -274,7 +274,17 @@ def post_quote_browser(tweet_url: str, text: str) -> tuple[bool, str]:
     if not inserted:
         return False, "text insert verify failed after 3 attempts"
 
-    time.sleep(1)
+    # Wait for Post button to become enabled (React needs time to process the text)
+    for _ in range(10):
+        btn_state = bw("eval", """(function(){
+            const btn = document.querySelector('[data-testid="tweetButton"]')
+                || document.querySelector('[data-testid="tweetButtonInline"]');
+            if (!btn) return 'no_btn';
+            return btn.getAttribute('aria-disabled') === 'true' ? 'disabled' : 'enabled';
+        })()""", timeout=5)
+        if btn_state.get("value") == "enabled":
+            break
+        time.sleep(0.5)
 
     # Click Post button
     click = bw("eval", """(function(){

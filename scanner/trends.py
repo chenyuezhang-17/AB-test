@@ -145,7 +145,7 @@ def convert_trend_to_search(trend: dict) -> dict | None:
     )
 
     try:
-        CLAUDE_BIN = "/Users/lessie/Library/Application Support/Claude/claude-code/2.1.92/claude.app/Contents/MacOS/claude"
+        CLAUDE_BIN = "/Users/lessie/.local/bin/claude"
         result = subprocess.run(
             [CLAUDE_BIN, "-p", prompt, "--system-prompt", CONVERT_PROMPT,
              "--output-format", "json", "--model", "sonnet"],
