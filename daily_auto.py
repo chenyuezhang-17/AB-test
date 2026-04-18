@@ -337,7 +337,7 @@ def post_s2(row):
     else:
         # Detect "tweet deleted / account suspended" vs transient errors
         err = str(result).lower()
-        if "retweet" in err or "no retweet" in err or "none" in err:
+        if "tweet_deleted" in err or "retweet" in err or "no retweet" in err or "none" in err:
             log(f"S2 ✗ @{author} — tweet deleted or account suspended, skipping")
             _mark_tweet_dead(tweet_id, "deleted")
             return "deleted"
@@ -603,6 +603,18 @@ def engage_kol():
                 break
             if not tweet.get("url"):
                 continue
+            # Extract tweet_id from URL and skip if already replied
+            _tid_match = __import__('re').search(r'/status/(\d+)', tweet["url"])
+            tweet_id_kol = _tid_match.group(1) if _tid_match else None
+            if tweet_id_kol:
+                _conn_chk = sqlite3.connect(DB)
+                _already = _conn_chk.execute(
+                    "SELECT 1 FROM posted_tweets WHERE original_tweet_id=?", (tweet_id_kol,)
+                ).fetchone()
+                _conn_chk.close()
+                if _already:
+                    log(f"  ↳ already replied to tweet {tweet_id_kol}, skipping")
+                    continue
             # Read full tweet text before generating reply
             full_text = _read_full_tweet(tweet["url"])
             if not full_text or len(full_text) < 15:
@@ -657,6 +669,8 @@ def engage_kol():
                             time.sleep(3)
                             log(f"  ✓ replied to @{tweet['author']}")
                             log_action(reply_text=reply, lessie_url="",
+                                       original_tweet_id=tweet_id_kol or "",
+                                       author=tweet.get("author", ""),
                                        scene="KOL Engagement", our_tweet_url="")
                             replied_total += 1
                             replies_per_kol += 1

@@ -212,6 +212,15 @@ def post_quote_browser(tweet_url: str, text: str) -> tuple[bool, str]:
     bw("goto", tweet_url, timeout=20)
     time.sleep(3)
 
+    # Check if tweet was deleted / page doesn't exist
+    page_check = bw("eval", """(function(){
+        const body = document.body.innerText || '';
+        if (body.includes("doesn't exist") || body.includes("page not found") || body.includes("This account")) return 'deleted';
+        return 'ok';
+    })()""")
+    if page_check.get("value") == "deleted":
+        return False, "tweet_deleted"
+
     # Click the Retweet button to open retweet menu
     rt_click = bw("eval", """(function(){
         const btns = document.querySelectorAll('[data-testid="retweet"]');
