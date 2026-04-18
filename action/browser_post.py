@@ -184,20 +184,30 @@ def _get_latest_reply_url(original_tweet_url: str) -> str | None:
 
 
 def _get_latest_tweet_url() -> str | None:
-    """Navigate to profile and return URL of the most recent tweet."""
+    """Navigate to profile and return URL of the most recent (non-pinned) tweet."""
     try:
         bw("goto", "https://x.com/alliiexia", timeout=15)
         time.sleep(3)
         result = bw("eval", """(function(){
             const articles = document.querySelectorAll('article[data-testid="tweet"]');
+            // Collect all tweet URLs with their datetime
+            const candidates = [];
             for (const a of articles) {
+                // Skip pinned tweets
+                const social = a.closest('[data-testid="cellInnerDiv"]');
+                if (social && social.innerText.includes('Pinned')) continue;
+                const timeEl = a.querySelector('time');
+                const dt = timeEl ? timeEl.getAttribute('datetime') : '';
                 const links = a.querySelectorAll('a[href*="/status/"]');
                 for (const l of links) {
                     const m = l.href.match(/alliiexia\\/status\\/(\\d+)/);
-                    if (m) return 'https://x.com/alliiexia/status/' + m[1];
+                    if (m) { candidates.push({url: l.href, dt: dt, id: parseInt(m[1])}); break; }
                 }
             }
-            return null;
+            // Return the one with the largest tweet ID (most recent)
+            if (!candidates.length) return null;
+            candidates.sort((a, b) => b.id - a.id);
+            return candidates[0].url;
         })()""")
         return result.get("value") or None
     except Exception:
@@ -205,34 +215,66 @@ def _get_latest_tweet_url() -> str | None:
 
 
 def post_quote_browser(tweet_url: str, text: str) -> tuple[bool, str]:
-    """Quote-repost a tweet via browser. Returns (success, url_or_error)."""
+    """Quote-repost via browser using retweet→Quote flow.
+
+    Key insight: insert text and click Post IMMEDIATELY in one JS call.
+    Any sleep between insert and click gives React time to re-render and clear the text.
+    """
     if not ensure_session():
         return False, "browser session failed to start"
 
-    bw("goto", tweet_url, timeout=20)
-    time.sleep(3)
+    # Extract author and tweet ID from URL
+    import re as _re
+    m = _re.search(r'x\.com/([^/]+)/status/(\d+)', tweet_url)
+    if not m:
+        return False, f"invalid tweet url: {tweet_url}"
+    author_handle, tweet_id = m.group(1), m.group(2)
 
-    # Check if tweet was deleted / page doesn't exist
+    # Check tweet exists first
+    bw("goto", tweet_url, timeout=20)
+    time.sleep(2)
     page_check = bw("eval", """(function(){
         const body = document.body.innerText || '';
-        if (body.includes("doesn't exist") || body.includes("page not found") || body.includes("This account")) return 'deleted';
+        if (body.includes("doesn't exist") || body.includes("This account")) return 'deleted';
         return 'ok';
     })()""")
     if page_check.get("value") == "deleted":
         return False, "tweet_deleted"
 
-    # Click the Retweet button to open retweet menu
-    rt_click = bw("eval", """(function(){
-        const btns = document.querySelectorAll('[data-testid="retweet"]');
-        if (!btns.length) return 'no retweet btn';
-        btns[0].click(); return 'clicked';
-    })()""")
+    # Use search page to find tweet as a card — avoids the inline-reply problem of detail page
+    bw("goto", f"https://x.com/search?q=from%3A{author_handle}&src=typed_query&f=live", timeout=20)
+    time.sleep(3)
+
+    # Scroll to find the tweet card
+    for _scroll in range(8):
+        check_card = bw("eval", f"""(function(){{
+            const articles = document.querySelectorAll('article[data-testid="tweet"]');
+            for (const a of articles) {{
+                if (a.querySelector('a[href*="/status/{tweet_id}"]')) return 'found';
+            }}
+            return 'not_found';
+        }})()""")
+        if check_card.get("value") == "found":
+            break
+        bw("eval", "window.scrollBy(0, 800)")
+        time.sleep(1.5)
+
+    # Click Retweet on the specific tweet card
+    rt_click = bw("eval", f"""(function(){{
+        const articles = document.querySelectorAll('article[data-testid="tweet"]');
+        for (const a of articles) {{
+            if (!a.querySelector('a[href*="/status/{tweet_id}"]')) continue;
+            const btn = a.querySelector('[data-testid="retweet"]');
+            if (btn) {{ btn.click(); return 'clicked'; }}
+        }}
+        return 'no retweet btn';
+    }})()""")
     if rt_click.get("value") != "clicked":
         return False, f"retweet btn failed: {rt_click.get('value')}"
 
     time.sleep(1.5)
 
-    # Click "Quote" option from the dropdown
+    # Click Quote from dropdown
     quote_click = bw("eval", """(function(){
         const items = document.querySelectorAll('[role="menuitem"]');
         for (const item of items) {
@@ -247,67 +289,49 @@ def post_quote_browser(tweet_url: str, text: str) -> tuple[bool, str]:
 
     time.sleep(2)
 
-    # Wait for the quote compose box
+    # Wait for modal compose textarea (not inline reply box)
     for _ in range(10):
         check = bw("eval", "document.querySelector('[data-testid=\"tweetTextarea_0\"][role=\"textbox\"]') ? 'ok' : 'no'")
         if check.get("value") == "ok":
             break
         time.sleep(1)
 
-    # Insert text using execCommand('selectAll') + insertText — this is the
-    # ONLY reliable way to trigger React's synthetic event and enable the Post button.
-    # CDP Input.insertText and direct .value assignment do NOT activate React state.
-    # We retry up to 3 times and verify the copy text (not just URL) is actually present.
-    copy_anchor = text[:40].replace("\n", " ").strip()  # first 40 chars of copy, no newlines
-    inserted = False
-    for _attempt in range(3):
-        bw("eval", f"""(function(){{
-            const el = document.querySelector('[data-testid="tweetTextarea_0"][role="textbox"]');
-            if (!el) return 'not found';
-            el.click(); el.focus();
-            document.execCommand('selectAll');
-            document.execCommand('insertText', false, {json.dumps(text)});
-        }})()""", timeout=15)
-        time.sleep(1)
-        verify = bw("eval", f"""(function(){{
-            const el = document.querySelector('[data-testid="tweetTextarea_0"][role="textbox"]');
-            if (!el) return 'no_el';
-            const txt = el.innerText || '';
-            return txt.includes({json.dumps(copy_anchor[:20])}) ? 'ok' : 'missing';
-        }})()""", timeout=8)
-        if verify.get("value") == "ok":
-            inserted = True
-            break
-        time.sleep(1)
+    # CRITICAL: insert text AND click Post in a single JS call — no sleep in between.
+    # Any delay gives React time to re-render and wipe the text before submit.
+    full_text = text  # tweet_url already embedded as quote card by Twitter
+    result = bw("eval", f"""(function(){{
+        const el = document.querySelector('[data-testid="tweetTextarea_0"][role="textbox"]');
+        if (!el) return 'no_textarea';
+        el.click(); el.focus();
+        document.execCommand('selectAll');
+        document.execCommand('insertText', false, {json.dumps(full_text)});
+        // Click Post immediately — no waiting
+        const btn = document.querySelector('[data-testid="tweetButton"]')
+            || document.querySelector('[data-testid="tweetButtonInline"]');
+        if (!btn) return 'no_btn';
+        if (btn.getAttribute('aria-disabled') === 'true') return 'btn_disabled';
+        btn.click();
+        return 'submitted';
+    }})()""", timeout=15)
 
-    if not inserted:
-        return False, "text insert verify failed after 3 attempts"
+    val = result.get("value", "")
+    if val not in ("submitted", "btn_disabled"):
+        return False, f"quote submit failed: {val}"
 
-    # Wait for Post button to become enabled (React needs time to process the text)
-    for _ in range(10):
-        btn_state = bw("eval", """(function(){
+    # If button was disabled (React not ready yet), wait briefly and retry once
+    if val == "btn_disabled":
+        time.sleep(1.5)
+        retry = bw("eval", """(function(){
             const btn = document.querySelector('[data-testid="tweetButton"]')
                 || document.querySelector('[data-testid="tweetButtonInline"]');
             if (!btn) return 'no_btn';
-            return btn.getAttribute('aria-disabled') === 'true' ? 'disabled' : 'enabled';
-        })()""", timeout=5)
-        if btn_state.get("value") == "enabled":
-            break
-        time.sleep(0.5)
-
-    # Click Post button
-    click = bw("eval", """(function(){
-        const btn = document.querySelector('[data-testid="tweetButton"]')
-            || document.querySelector('[data-testid="tweetButtonInline"]');
-        if (!btn) return 'no button';
-        if (btn.getAttribute('aria-disabled') === 'true') return 'disabled';
-        btn.click(); return 'clicked';
-    })()""")
-    if click.get("value") != "clicked":
-        return False, f"post click failed: {click.get('value')}"
+            if (btn.getAttribute('aria-disabled') === 'true') return 'still_disabled';
+            btn.click(); return 'clicked';
+        })()""")
+        if retry.get("value") not in ("clicked",):
+            return False, f"retry click failed: {retry.get('value')}"
 
     time.sleep(3)
-
     tweet_link = _get_latest_tweet_url()
     return True, tweet_link or "posted"
 
