@@ -548,7 +548,7 @@ def engage_kol():
         if follower_count:
             log(f"  @{username} followers: {follower_count:,}{' (big KOL → will follow after reply)' if is_big_kol else ''}")
 
-        # Collect tweets from their timeline
+        # Collect tweets from their timeline (only 2025+ tweets)
         result = _bw_alliiexia("eval", """(function(){
             const articles = document.querySelectorAll('article[data-testid="tweet"]');
             const out = [];
@@ -556,8 +556,15 @@ def engage_kol():
                 const links = a.querySelectorAll('a[href*="/status/"]');
                 const textEl = a.querySelector('[data-testid="tweetText"]');
                 const userEl = a.querySelector('[data-testid="User-Name"] a');
+                const timeEl = a.querySelector('time');
                 let uname = '';
                 if (userEl) { const m = userEl.href.match(/x\\.com\\/([^/]+)/); if (m) uname = m[1]; }
+                // Skip tweets older than 2025
+                if (timeEl) {
+                    const dt = timeEl.getAttribute('datetime') || '';
+                    const year = parseInt(dt.slice(0, 4));
+                    if (year < 2025) return;
+                }
                 for (const l of links) {
                     const m = l.href.match(/x\\.com\\/[^/]+\\/status\\/(\\d+)/);
                     if (m && uname) {
@@ -570,17 +577,24 @@ def engage_kol():
         })()""")
         tweets = result.get("value") or []
 
-        # Like 1 tweet per KOL visit — skip tweets by @alliiexia (self-like prevention)
+        # Like 1 tweet per KOL visit — skip self and pre-2025 tweets
         likes_here = 0
         if liked_total < DAILY_KOL_LIKES:
             like_res = _bw_alliiexia("eval", """(function(){
                 const articles = document.querySelectorAll('article[data-testid="tweet"]');
                 for (const article of articles) {
-                    // Check tweet author — skip if it's our own account
+                    // Skip own tweets
                     const userEl = article.querySelector('[data-testid="User-Name"] a');
                     if (userEl) {
                         const m = userEl.href.match(/x\\.com\\/([^/]+)/);
                         if (m && m[1].toLowerCase() === 'alliiexia') continue;
+                    }
+                    // Skip tweets older than 2025
+                    const timeEl = article.querySelector('time');
+                    if (timeEl) {
+                        const dt = timeEl.getAttribute('datetime') || '';
+                        const year = parseInt(dt.slice(0, 4));
+                        if (year < 2025) continue;
                     }
                     const btn = article.querySelector('[data-testid="like"]');
                     if (!btn) continue;
