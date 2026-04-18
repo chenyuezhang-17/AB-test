@@ -135,7 +135,10 @@ def _create_share_link_jwt(checkpoint: str) -> str | None:
     conversation_id = None
     has_results = False
     try:
-        with httpx.Client(timeout=120) as client:
+        # read timeout: 30s per chunk; total stream capped at 90s via deadline
+        import time as _t
+        deadline = _t.time() + 90
+        with httpx.Client(timeout=httpx.Timeout(connect=10, read=30, write=10, pool=5)) as client:
             with client.stream(
                 "POST",
                 f"{LESSIE_APP}/sourcing-api/chat/v1/stream",
@@ -143,6 +146,9 @@ def _create_share_link_jwt(checkpoint: str) -> str | None:
                 json=stream_body,
             ) as response:
                 for line in response.iter_lines():
+                    if _t.time() > deadline:
+                        print("[bridge] Stream deadline reached (90s), proceeding")
+                        break
                     if not line.startswith("data: "):
                         continue
                     try:
