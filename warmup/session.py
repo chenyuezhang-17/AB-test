@@ -53,6 +53,14 @@ async def handle_client(reader, writer, ctrl):
         elif cmd == "scroll_up":
             await ctrl.scroll_up(int(arg) if arg else 500)
             result = {"ok": True}
+        elif cmd == "click_xy":
+            try:
+                x, y = [float(v) for v in arg.split(",")]
+                await ctrl.chrome.click(x, y)
+                await asyncio.sleep(0.3)
+                result = {"ok": True, "clicked_xy": [x, y]}
+            except Exception as e:
+                result = {"ok": False, "error": str(e)}
         elif cmd == "wait":
             await asyncio.sleep(float(arg) if arg else 2)
             result = {"ok": True}

@@ -292,6 +292,18 @@ def post_original_tweet(text: str) -> tuple[bool, str]:
         if check.get("value") == "ok":
             break
         time.sleep(1)
+    # Get textarea coordinates and use CDP mouse click for real browser-level focus
+    rect = bw("eval", """(function(){
+        const el = document.querySelector('[data-testid="tweetTextarea_0"][role="textbox"]');
+        if (!el) return null;
+        const r = el.getBoundingClientRect();
+        return JSON.stringify({x: Math.round(r.left + r.width/2), y: Math.round(r.top + 10)});
+    })()""")
+    import json as _json
+    coords = _json.loads(rect.get("value") or "null")
+    if coords:
+        bw("click_xy", f"{coords['x']},{coords['y']}")
+        time.sleep(0.3)
     focus = bw("eval", """(function(){
         const el = document.querySelector('[data-testid="tweetTextarea_0"][role="textbox"]');
         if (!el) return 'not_found';

@@ -389,6 +389,13 @@ def run_replies():
     log(f"Replies: done {replied} replies")
 
 
+# Big accounts — retweet risk (high follower count = spam signal). Like/reply OK.
+RETWEET_BLOCKED_ACCOUNTS = {
+    "elonmusk", "realdonaldtrump", "cz_binance", "sama", "naval", "paulg",
+    "karpathy", "garrytan", "ycombinator", "openai", "google", "microsoft",
+    "spacex", "tesla", "meta", "amazon", "apple", "netflix",
+}
+
 def run_retweets():
     done = _today_count("retweet")
     if done >= DAILY_RETWEETS:
@@ -433,6 +440,9 @@ def run_retweets():
         url = tweet.get("url", "")
         author = tweet.get("author", "")
         if not url:
+            continue
+        if author.lower() in RETWEET_BLOCKED_ACCOUNTS:
+            log(f"  [rt skip] @{author} — big account, skip retweet (like/reply OK)")
             continue
         log(f"  Retweeting @{author}: {url}")
         ok = retweet_tweet(url)
