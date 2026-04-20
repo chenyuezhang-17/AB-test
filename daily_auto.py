@@ -37,16 +37,12 @@ def log(msg):
 # ─── session ───────────────────────────────────────────────────────────────
 
 def ensure_browser():
-    if not _is_session_running():
-        log("Browser session dead — restarting...")
-        subprocess.Popen(
-            [sys.executable, "-m", "browser.session"],
-            cwd="/Users/lessie/cc/AB-test/action",
-            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
-            start_new_session=True
-        )
-        time.sleep(7)
-    return True
+    """Ensure browser session is running AND WebSocket is alive (real ping)."""
+    from action.browser_post import ensure_session
+    ok = ensure_session()
+    if not ok:
+        log("Browser session failed to start")
+    return ok
 
 # ─── learn from yesterday ──────────────────────────────────────────────────
 
@@ -393,6 +389,7 @@ def post_s2(row):
         return "error"
     reply = f"{reply_text}\n\n{share_url}"
     log(f"S2 posting @{author} [{intent}]: {reply_text[:100]}")
+    # CDP stream takes 4-7 min — session WebSocket may have timed out, reconnect before posting
     ensure_browser()
     ok, result = post_quote_browser(tweet_url, reply)
     if ok:
