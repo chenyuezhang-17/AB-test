@@ -253,7 +253,7 @@ def post_s1(row):
     tid, topic, hook, search_prompt = row
     checkpoint = search_prompt or f"Find professionals relevant to: {topic}"
     log(f"S1 checkpoint: {checkpoint[:100]}")
-    share_url = _create_share_link(checkpoint)
+    share_url, _ = _create_share_link(checkpoint)
     if not share_url:
         log(f"S1 ✗ share link failed, skipping (won't post homepage link)")
         return False
@@ -302,7 +302,7 @@ GOOD examples:
 Output: just the reply text, no JSON, no quotes."""
 
 
-def _generate_s2_reply(tweet_text: str, author: str, intent: str, checkpoint: str):
+def _generate_s2_reply(tweet_text: str, author: str, intent: str, checkpoint: str, total_found: int = 0):
     """Generate a personalized S2 quote reply using Claude CLI.
 
     Returns the reply text, or None if generation fails (caller should skip this tweet).
@@ -313,10 +313,12 @@ def _generate_s2_reply(tweet_text: str, author: str, intent: str, checkpoint: st
     if strategy:
         strategy_block = f"\n--- STRATEGY (from past performance) ---\n{strategy[:600]}\n---\n\n"
 
+    count_hint = f"Results found: ~{total_found} people\n\n" if total_found > 0 else ""
     prompt = (
         f"{strategy_block}"
         f"Original tweet by @{author} ({intent}):\n\"{tweet_text[:400]}\"\n\n"
         f"Search that was run: {checkpoint[:200]}\n\n"
+        f"{count_hint}"
         f"Write the reply:"
     )
     claude_bin = (
@@ -370,11 +372,22 @@ def post_s2(row):
     tweet_url = f"https://x.com/{author}/status/{tweet_id}"
     checkpoint = _build_search_prompt(tweet_text_raw, author)
     log(f"S2 checkpoint: {checkpoint[:100]}")
-    share_url = _create_share_link(checkpoint)
+
+    # Sanity check: if Claude returned a rejection/analysis instead of a real prompt, skip
+    CHECKPOINT_REJECT_SIGNALS = [
+        "no hiring intent", "no role", "no candidate", "commentary", "not a job",
+        "not a hiring", "cannot construct", "no search", "this tweet contains",
+    ]
+    if len(checkpoint) < 20 or any(s in checkpoint.lower() for s in CHECKPOINT_REJECT_SIGNALS):
+        log(f"S2 ✗ @{author} — checkpoint looks invalid (not a real hiring tweet), skipping")
+        _mark_tweet_dead(tweet_id, "failed")
+        return "error"
+
+    share_url, total_found = _create_share_link(checkpoint)
     if not share_url:
         log(f"S2 ✗ @{author} — share link creation failed, skipping (won't post homepage link)")
         return "error"
-    reply_text = _generate_s2_reply(tweet_text_raw, author, intent, checkpoint)
+    reply_text = _generate_s2_reply(tweet_text_raw, author, intent, checkpoint, total_found=total_found)
     if reply_text is None:
         log(f"S2 ✗ @{author} — reply generation failed, skipping to next candidate")
         return "error"
