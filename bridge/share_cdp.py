@@ -62,27 +62,27 @@ def _session_alive() -> bool:
 
 # ─── CDP share link creation ─────────────────────────────────────────────
 
-def create_share_link_cdp(search_prompt: str) -> str | None:
+def create_share_link_cdp(search_prompt: str) -> tuple[str | None, int]:
     """Create a Lessie share link using browser cookies via CDP.
 
     Navigate to app.lessie.ai (for cookie scope), then use fetch()
     to call the same API endpoints. Browser sends cookies automatically.
 
-    Returns: "https://app.lessie.ai/share/xxxxx" or None
+    Returns: (url, total_found) — url is None on failure, total_found may be 0 if not reported
     """
     if not _session_alive():
         print("[share_cdp] Browser session not running, skipping CDP method")
-        return None
+        return None, 0
 
     try:
         return _do_create(search_prompt)
     except Exception as e:
         print(f"[share_cdp] Error: {e}")
-        return None
+        return None, 0
 
 
-def _do_create(search_prompt: str) -> str | None:
-    """Internal: three-phase share link creation."""
+def _do_create(search_prompt: str) -> tuple[str | None, int]:
+    """Internal: three-phase share link creation. Returns (url, total_found)."""
 
     # Navigate to Lessie domain so fetch() sends the right cookies
     goto_res = _bw("goto", "https://app.lessie.ai", timeout=20)
@@ -146,6 +146,9 @@ def _do_create(search_prompt: str) -> str | None:
                             }}
                             if (data.person_info_list || data.persons || data.results || data.total) {{
                                 window.__ls.has_results = true;
+                                if (data.total && !window.__ls.total) window.__ls.total = data.total;
+                                if (data.person_info_list && data.person_info_list.length)
+                                    window.__ls.total = window.__ls.total || data.person_info_list.length;
                             }}
                             if (data.status === 'done' || data.status === 'finished' ||
                                 data.status === 'complete' || data.is_finished) {{
@@ -170,7 +173,7 @@ def _do_create(search_prompt: str) -> str | None:
 
     if phase1.get("value") != "started":
         print(f"[share_cdp] Phase 1 failed: {phase1}")
-        return None
+        return None, 0
 
     print("[share_cdp] Search stream started, polling...")
 
@@ -189,16 +192,18 @@ def _do_create(search_prompt: str) -> str | None:
 
         if status == "error":
             print(f"[share_cdp] Stream error: {s.get('error')}")
-            return None
+            return None, 0
 
         if status == "done" and conv_id:
             has = "with" if s.get("has_results") else "without"
-            print(f"[share_cdp] Search done ({has} results), conv={conv_id[:16]}...")
+            total_found = s.get("total") or 0
+            print(f"[share_cdp] Search done ({has} results, total={total_found}), conv={conv_id[:16]}...")
             break
 
         # Early exit: got conv_id but stream seems stalled after 60s
         if conv_id and i >= 20:
             print(f"[share_cdp] Stream stalled but have conv_id, proceeding")
+            total_found = s.get("total") or 0
             break
 
         if i > 0 and i % 10 == 0:
@@ -206,9 +211,10 @@ def _do_create(search_prompt: str) -> str | None:
     else:
         if conv_id:
             print(f"[share_cdp] Timeout but have conv_id, trying share anyway")
+            total_found = 0
         else:
             print("[share_cdp] Timeout: no conversation_id after 120s")
-            return None
+            return None, 0
 
     # Brief pause for server to finalize results
     time.sleep(2)
@@ -242,10 +248,10 @@ def _do_create(search_prompt: str) -> str | None:
             if share_id:
                 url = f"https://app.lessie.ai/share/{share_id}"
                 print(f"[share_cdp] share link created: {url}")
-                return url
+                return url, total_found
 
         print(f"[share_cdp] Share API unexpected response: {data}")
     else:
         print(f"[share_cdp] Could not parse share response: {share_result}")
 
-    return None
+    return None, 0

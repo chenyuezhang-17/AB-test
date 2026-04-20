@@ -73,30 +73,29 @@ def _build_search_prompt(tweet_text: str, author: str = "") -> str:
     return tweet_text[:400] or f"{author} hiring talent"
 
 
-def _create_share_link(checkpoint: str) -> str | None:
-    """Create a Lessie share link. Tries JWT first, then CDP as fallback.
+def _create_share_link(checkpoint: str) -> tuple[str | None, int]:
+    """Create a Lessie share link. Returns (url, total_found).
 
-    Two independent methods — if one fails, the other takes over:
-    1. JWT (fast, pure HTTP) — expires every ~7 days
-    2. CDP (browser cookies) — always fresh if Chrome is logged in
+    Tries JWT first (fast), then CDP (uses browser cookies).
+    CDP is the primary working method — JWT expires every ~7 days.
     """
     # Method 1: JWT (fast, no browser session needed)
     url = _create_share_link_jwt(checkpoint)
     if url:
-        return url
+        return url, 0  # JWT path doesn't return count
 
-    # Method 2: CDP fallback (uses browser's auth cookies)
-    print("[bridge] JWT failed, trying CDP fallback...")
+    # Method 2: CDP (uses browser's auth cookies, also returns result count)
+    print("[bridge] JWT failed, trying CDP...")
     try:
         from bridge.share_cdp import create_share_link_cdp
-        url = create_share_link_cdp(checkpoint)
+        url, total = create_share_link_cdp(checkpoint)
         if url:
-            return url
+            return url, total
     except Exception as e:
-        print(f"[bridge] CDP fallback error: {e}")
+        print(f"[bridge] CDP error: {e}")
 
     print("[bridge] Both JWT and CDP methods failed")
-    return None
+    return None, 0
 
 
 def _create_share_link_jwt(checkpoint: str) -> str | None:
@@ -274,33 +273,33 @@ def _generate_reply(tweet: AnalyzedTweet, search_data: dict, total_found: int) -
 
 
 def search_lessie(tweet: AnalyzedTweet) -> PreparedReply | None:
-    """Search Lessie and generate personalized reply with share link."""
+    """Search Lessie and generate personalized reply with share link.
+
+    Single CDP call: creates conversation, gets results, creates share link.
+    No separate CLI search needed — CDP does everything in one shot.
+    """
     search_data = json.loads(tweet.search_query)
     checkpoint = search_data.get("checkpoint", "")
 
-    # 1. Search via CLI (fast, structured results)
-    lessie_result = _call_lessie_cli(search_data)
-    total_found = 0
-    if lessie_result and lessie_result.get("success"):
-        total_found = lessie_result.get("total_found", 0)
+    # One call: search + share link via CDP (browser cookies)
+    print(f"[bridge] Creating share link via CDP...")
+    lessie_url, total_found = _create_share_link(checkpoint)
+
+    if not lessie_url:
+        print(f"[bridge] Share link failed — skipping tweet {tweet.tweet_id}")
+        return None
 
     if total_found == 0:
-        print(f"[bridge] No results for tweet {tweet.tweet_id}")
-        return None
+        print(f"[bridge] Warning: no result count from CDP stream (proceeding anyway)")
+        total_found = 10  # conservative fallback for reply copy
 
-    # 2. Create share link via Web API (uses the same checkpoint query)
-    print(f"[bridge] Creating share link...")
-    lessie_url = _create_share_link(checkpoint)
-    if not lessie_url:
-        print(f"[bridge] Share link failed — refusing to post homepage link, skipping")
-        return None
+    print(f"[bridge] Got share link, {total_found} results")
 
-    # 3. Generate personalized reply
+    # Generate personalized reply
     reply_text = _generate_reply(tweet, search_data, total_found)
     if not reply_text:
         reply_text = f"found {total_found} matches that look solid 👀"
 
-    # 4. Append link
     full_reply = f"{reply_text}\n{lessie_url}"
 
     return PreparedReply(
