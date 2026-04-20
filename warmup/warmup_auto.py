@@ -36,19 +36,16 @@ SEED_ACCOUNTS = [
     "hunterwalk", "garrytan", "naval", "shreyas", "shl",
 ]
 
-# ─── Diversified search queries ───────────────────────────────────────────
+# ─── Broad search queries (NA filter applied post-fetch) ──────────────────
 LIKE_QUERIES = [
-    # Tech/Hiring (existing audience)
     "hiring AI engineer 2026 lang:en",
     "open to work software engineer lang:en",
     "AI startup building team lang:en",
     "machine learning engineer hiring lang:en",
-    # Growth/Marketing (new audience)
     "growth marketing strategy 2026 lang:en",
     "PLG product led growth lang:en",
     "B2B SaaS marketing lang:en",
     "content marketing strategy lang:en",
-    # Creator/Lifestyle (new audience)
     "building in public founder lang:en",
     "newsletter growth strategy lang:en",
     "creator economy tools lang:en",
@@ -59,16 +56,49 @@ REPLY_QUERIES = [
     "looking for cofounder technical lang:en",
     "open to work senior engineer lang:en",
     "AI startup hiring engineers lang:en",
-    # Growth/Marketing
     "growth marketing tips lang:en",
     "SaaS founder advice lang:en",
-    # Creator
     "building in public update lang:en",
     "newsletter milestone lang:en",
 ]
 
+# ─── Non-NA signals — skip accounts/tweets with these in bio/location ─────
+NON_NA_BIO_SIGNALS = [
+    # South/Southeast Asia
+    "india", "bangalore", "bengaluru", "mumbai", "delhi", "hyderabad", "chennai",
+    "pune", "kolkata", "pakistan", "sri lanka", "nepal", "bangladesh",
+    "singapore", "malaysia", "indonesia", "philippines", "vietnam", "thailand",
+    "myanmar", "cambodia", "laos",
+    # East Asia
+    "china", "beijing", "shanghai", "shenzhen", "guangzhou",
+    "japan", "tokyo", "osaka", "korea", "seoul", "taiwan", "taipei",
+    "hong kong", "hongkong",
+    # Europe
+    "uk", "london", "manchester", "united kingdom", "england", "scotland",
+    "germany", "berlin", "munich", "france", "paris", "spain", "madrid",
+    "italy", "rome", "milan", "netherlands", "amsterdam", "sweden", "stockholm",
+    "norway", "denmark", "finland", "switzerland", "zurich", "poland", "warsaw",
+    "portugal", "lisbon", "belgium", "brussels", "austria", "vienna",
+    # Middle East & Africa
+    "dubai", "uae", "abu dhabi", "saudi", "riyadh", "israel", "tel aviv",
+    "egypt", "cairo", "nigeria", "lagos", "kenya", "nairobi", "south africa",
+    "johannesburg", "cape town", "ghana", "accra",
+    # Latin America
+    "brazil", "são paulo", "sao paulo", "rio de janeiro", "brasil",
+    "mexico", "ciudad de mexico", "argentina", "buenos aires", "colombia",
+    "bogota", "chile", "santiago", "peru", "lima",
+    # Australia/NZ (not NA)
+    "australia", "sydney", "melbourne", "brisbane", "new zealand", "auckland",
+]
+
+
+def _is_non_na(location: str, bio: str) -> bool:
+    """Return True if location or bio strongly suggests non-North-America."""
+    text = (location + " " + bio).lower()
+    return any(sig in text for sig in NON_NA_BIO_SIGNALS)
+
 # ─── Daily limits ──────────────────────────────────────────────────────────
-DAILY_FOLLOWS  = 3
+DAILY_FOLLOWS  = 1
 DAILY_LIKES    = 25
 DAILY_REPLIES  = 4
 DAILY_RETWEETS = 2
@@ -133,6 +163,27 @@ def _already_followed(username: str) -> bool:
 
 # ─── Task runners ──────────────────────────────────────────────────────────
 
+def _get_user_location_bio(username: str) -> tuple[str, str]:
+    """Navigate to user profile and extract location + bio text."""
+    try:
+        bw("goto", f"https://x.com/{username}", timeout=15)
+        time.sleep(2)
+        result = bw("eval", """(function(){
+            const loc = document.querySelector('[data-testid="UserLocation"]');
+            const bio = document.querySelector('[data-testid="UserDescription"]');
+            return {
+                location: loc ? loc.innerText.trim() : '',
+                bio: bio ? bio.innerText.trim() : ''
+            };
+        })()""", timeout=8)
+        data = result.get("value") or {}
+        if isinstance(data, dict):
+            return data.get("location", ""), data.get("bio", "")
+    except Exception:
+        pass
+    return "", ""
+
+
 def run_follows():
     done = _today_count("follow")
     if done >= DAILY_FOLLOWS:
@@ -141,13 +192,13 @@ def run_follows():
     needed = DAILY_FOLLOWS - done
     log(f"Follows: need {needed} more (done {done}/{DAILY_FOLLOWS})")
 
-    # Mix: Twitter's "Who to follow" + user search results
+    # Mix: Twitter's "Who to follow" + user search results (North America only)
     queries = [
-        "AI engineer startup",
-        "machine learning hiring",
-        "tech founder building",
-        "software engineer open to work",
-        "AI researcher",
+        "AI engineer startup USA",
+        "machine learning engineer San Francisco",
+        "tech founder building US",
+        "software engineer New York remote",
+        "YC founder hiring",
     ]
     candidates = get_who_to_follow(limit=20)
     q = random.choice(queries)
@@ -163,7 +214,12 @@ def run_follows():
             break
         if _already_followed(username):
             continue
-        log(f"  Following @{username}...")
+        # Check profile location/bio before following
+        loc, bio = _get_user_location_bio(username)
+        if _is_non_na(loc, bio):
+            log(f"  [skip] @{username} — non-NA location: '{loc}'")
+            continue
+        log(f"  Following @{username} (location: '{loc or 'unknown'}')...")
         ok = follow_user(username)
         if ok:
             _log_action("follow", username)
@@ -264,13 +320,18 @@ def _collect_reply_candidates(n: int = 15) -> list[dict]:
     })()""")
     candidates += result2.get("value") or []
 
-    # Deduplicate by URL
+    # Deduplicate by URL + filter non-NA by tweet text signals
     seen = set()
     deduped = []
     for c in candidates:
-        if c.get("url") and c["url"] not in seen and c.get("text"):
-            seen.add(c["url"])
-            deduped.append(c)
+        if not c.get("url") or c["url"] in seen or not c.get("text"):
+            continue
+        seen.add(c["url"])
+        # Quick non-NA text check (bio location not fetched here for speed)
+        tweet_text = c.get("text", "").lower()
+        if _is_non_na("", tweet_text):
+            continue
+        deduped.append(c)
 
     return deduped[:n]
 

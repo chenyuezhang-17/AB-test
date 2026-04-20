@@ -42,6 +42,7 @@ Given a tweet, determine if this person genuinely needs help finding someone.
 - Exclude: venting, bragging, generic industry commentary, joke tweets, news sharing
 - Exclude: "looking for job" posts (the person IS the seeker, not the finder)
 - Confidence > 0.8 = clear explicit ask; 0.6-0.8 = implied but real need; < 0.6 = too vague
+- NORTH AMERICA ONLY: set has_intent = false if the role/search is explicitly for India, Southeast Asia, Europe, Africa, Middle East, or Latin America. Only engage with North America (US, Canada) market hiring. Remote-only roles with no location mentioned are OK.
 
 Respond in JSON only, no markdown:
 {

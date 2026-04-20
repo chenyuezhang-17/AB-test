@@ -105,6 +105,42 @@ def learn_from_yesterday():
 AUTHOR_MAX_QUOTES   = 2    # max times we ever quote the same author
 AUTHOR_COOLDOWN_DAYS = 7   # must wait this many days before re-quoting
 
+# Never quote-repost these — government, law enforcement, political, military
+BLOCKED_AUTHOR_KEYWORDS = [
+    "fbi", "cia", "nsa", "doj", "dhs", "nypd", "lapd", "police", "sheriff",
+    "gov", "government", "senate", "congress", "whitehouse", "potus", "flotus",
+    "army", "navy", "airforce", "marines", "military", "pentagon",
+    "republican", "democrat", "gop", "trump", "biden", "kamala",
+    "federal", "agency", "bureau", "department",
+]
+BLOCKED_TWEET_KEYWORDS = [
+    "fbi", "federal bureau", "#fbijobs", "special agent", "defend the homeland",
+    "law enforcement", "police department", "sheriff", "military", "veteran jobs",
+    "government job", "apply at", "fbijobs.gov", "usajobs",
+]
+
+# Only engage with North America market — skip if tweet mentions non-NA locations
+NON_NA_KEYWORDS = [
+    # India
+    "india", "bangalore", "bengaluru", "mumbai", "delhi", "hyderabad", "pune",
+    "chennai", "coimbatore", "kolkata", "ahmedabad", "noida", "gurugram",
+    "naukri", "tier-2", "tier 2", "iit", "nit",
+    # Other Asia
+    "singapore", "jakarta", "manila", "kuala lumpur", "ho chi minh",
+    "tokyo", "seoul", "beijing", "shanghai", "shenzhen", "hong kong",
+    # Europe (non-remote)
+    "london", "berlin", "paris", "amsterdam", "barcelona", "madrid",
+    "stockholm", "copenhagen", "dublin", "zurich",
+    # Latin America
+    "brazil", "argentina", "mexico city", "bogota", "lima",
+    # Middle East / Africa
+    "dubai", "riyadh", "cairo", "lagos", "nairobi",
+    "johannesburg", "sandton", "gauteng", "cape town", "durban", "pretoria",
+    "south africa", "nigeria", "kenya", "ghana", "ethiopia",
+    # Explicit non-NA indicators
+    "latam", "apac", "emea", "mena",
+]
+
 def pick_s2_candidates(n=3):
     """Pick n S2 candidates not yet posted, prioritising diversity of intent.
 
@@ -166,6 +202,19 @@ def pick_s2_candidates(n=3):
         if author in seen_authors:
             continue
         if tweet_id in posted_ids or tweet_id in suspended:
+            continue
+        # Skip political / government / law enforcement accounts and tweets
+        author_lower = (author or "").lower()
+        text_lower = (text or "").lower()
+        if any(kw in author_lower for kw in BLOCKED_AUTHOR_KEYWORDS):
+            log(f"  [S2 skip] @{author} — blocked author keyword")
+            continue
+        if any(kw in text_lower for kw in BLOCKED_TWEET_KEYWORDS):
+            log(f"  [S2 skip] @{author} — blocked tweet keyword")
+            continue
+        # Skip non-North America markets
+        if any(kw in text_lower for kw in NON_NA_KEYWORDS):
+            log(f"  [S2 skip] @{author} — non-NA market")
             continue
         hist = author_history.get(author)
         if hist:
@@ -533,6 +582,19 @@ def engage_kol():
         log(f"  Visiting @{username} [{kol_category}]...")
         _bw_alliiexia("goto", f"https://x.com/{username}", timeout=20)
         time.sleep(3)
+
+        # Skip AI video / video SaaS accounts — not relevant to Lessie's audience
+        bio_check = _bw_alliiexia("eval", """(function(){
+            const bio = (document.querySelector('[data-testid="UserDescription"]') || {}).innerText || '';
+            return bio.toLowerCase();
+        })()""", timeout=8)
+        bio_text = bio_check.get("value") or ""
+        VIDEO_SAAS_SIGNALS = ["video ai", "ai video", "video saas", "video tool", "video platform",
+                               "video generation", "video creator", "loom", "descript", "runway",
+                               "heygen", "synthesia", "sora", "video editing", "short video"]
+        if any(sig in bio_text for sig in VIDEO_SAAS_SIGNALS):
+            log(f"  [kol skip] @{username} — AI video/SaaS bio, skipping")
+            continue
 
         # Read follower count from profile page
         follower_res = _bw_alliiexia("eval", """(function(){

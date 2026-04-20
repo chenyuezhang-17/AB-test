@@ -241,35 +241,21 @@ def post_quote_browser(tweet_url: str, text: str) -> tuple[bool, str]:
     if page_check.get("value") == "deleted":
         return False, "tweet_deleted"
 
-    # Use search page to find tweet as a card — avoids the inline-reply problem of detail page
-    bw("goto", f"https://x.com/search?q=from%3A{author_handle}&src=typed_query&f=live", timeout=20)
-    time.sleep(3)
-
-    # Scroll to find the tweet card
-    for _scroll in range(8):
-        check_card = bw("eval", f"""(function(){{
-            const articles = document.querySelectorAll('article[data-testid="tweet"]');
-            for (const a of articles) {{
-                if (a.querySelector('a[href*="/status/{tweet_id}"]')) return 'found';
-            }}
-            return 'not_found';
-        }})()""")
-        if check_card.get("value") == "found":
-            break
-        bw("eval", "window.scrollBy(0, 800)")
-        time.sleep(1.5)
-
-    # Click Retweet on the specific tweet card
+    # We are already on the tweet detail page — click Retweet directly.
+    # Detail page retweet→Quote opens the proper compose modal (not inline reply).
     rt_click = bw("eval", f"""(function(){{
         const articles = document.querySelectorAll('article[data-testid="tweet"]');
         for (const a of articles) {{
             if (!a.querySelector('a[href*="/status/{tweet_id}"]')) continue;
             const btn = a.querySelector('[data-testid="retweet"]');
             if (btn) {{ btn.click(); return 'clicked'; }}
+            return 'no_rt_in_article';
         }}
+        const btn = document.querySelector('[data-testid="retweet"]');
+        if (btn) {{ btn.click(); return 'clicked_fallback'; }}
         return 'no retweet btn';
     }})()""")
-    if rt_click.get("value") != "clicked":
+    if "clicked" not in rt_click.get("value", ""):
         return False, f"retweet btn failed: {rt_click.get('value')}"
 
     time.sleep(1.5)
@@ -303,7 +289,20 @@ def post_quote_browser(tweet_url: str, text: str) -> tuple[bool, str]:
     full_text = text
     copy_anchor = full_text[:30].replace("\n", " ").strip()
 
-    # Focus the textarea first
+    # CDP mouse click at textarea coordinates → sets real browser-level focus.
+    # JS el.focus() only sets DOM activeElement; Input.insertText needs OS-level focus.
+    rect = bw("eval", """(function(){
+        const el = document.querySelector('[data-testid="tweetTextarea_0"][role="textbox"]');
+        if (!el) return null;
+        const r = el.getBoundingClientRect();
+        return JSON.stringify({x: Math.round(r.left + r.width/2), y: Math.round(r.top + 10)});
+    })()""")
+    coords = json.loads(rect.get("value") or "null")
+    if coords:
+        bw("click_xy", f"{coords['x']},{coords['y']}")
+        time.sleep(0.3)
+
+    # Focus via JS as well (belt + suspenders)
     focus = bw("eval", """(function(){
         const el = document.querySelector('[data-testid="tweetTextarea_0"][role="textbox"]');
         if (!el) return 'not_found';
@@ -312,7 +311,7 @@ def post_quote_browser(tweet_url: str, text: str) -> tuple[bool, str]:
     })()""", timeout=10)
     if focus.get("value") != "focused":
         return False, f"could not focus quote textarea: {focus.get('value')}"
-    time.sleep(0.5)
+    time.sleep(0.3)
 
     # Type via CDP — slow but reliable (React processes each keystroke)
     bw("type", full_text, timeout=120)

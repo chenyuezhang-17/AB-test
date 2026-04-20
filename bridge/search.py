@@ -292,8 +292,8 @@ def search_lessie(tweet: AnalyzedTweet) -> PreparedReply | None:
     print(f"[bridge] Creating share link...")
     lessie_url = _create_share_link(checkpoint)
     if not lessie_url:
-        lessie_url = "https://lessie.ai"  # fallback to homepage
-        print(f"[bridge] Share link failed, using fallback URL")
+        print(f"[bridge] Share link failed — refusing to post homepage link, skipping")
+        return None
 
     # 3. Generate personalized reply
     reply_text = _generate_reply(tweet, search_data, total_found)

@@ -73,6 +73,16 @@ async def handle_client(
             else:
                 result = {"ok": False, "error": f"label '{arg}' not found"}
 
+        elif cmd == "click_xy":
+            try:
+                x, y = [float(v) for v in arg.split(",")]
+                await ctrl.chrome.click(x, y)
+                await asyncio.sleep(0.3)
+                focus_info = await ctrl.get_focused_info()
+                result = {"ok": True, "clicked_xy": [x, y], **focus_info}
+            except Exception as e:
+                result = {"ok": False, "error": str(e)}
+
         elif cmd == "type":
             await ctrl.type_text(arg)
             # Verify by reading back focused element
