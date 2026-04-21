@@ -192,13 +192,14 @@ class ChromeBrowser:
             )
 
     async def type_text(self, text: str, delay: float = 0.03) -> None:
-        """Type text using Input.insertText (works with custom components)."""
-        for char in text:
-            await self.send(
-                "Input.insertText",
-                {"text": char},
-            )
-            await asyncio.sleep(delay)
+        """Type text using a single Input.insertText call.
+
+        Sending the full string at once avoids Twitter/DraftJS mid-type URL
+        detection which scrambles characters when typed one-by-one (e.g.
+        'https://' gets converted to a link entity mid-keystroke, shifting
+        the cursor so subsequent chars land in the wrong position).
+        """
+        await self.send("Input.insertText", {"text": text})
 
     async def fill_text(self, text: str) -> dict:
         """Fill text into focused element using execCommand (React-safe).
