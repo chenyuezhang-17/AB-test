@@ -545,12 +545,11 @@ def _generate_kol_reply(tweet_text: str, author: str, category: str = "tech"):
     strategy = load_kol_strategy(category=category, account="alliiexia")
     strategy_block = ""
     if strategy:
-        strategy_block = f"--- STRATEGY ({category}) ---\n{strategy[:400]}\n---\n\n"
+        strategy_block = f"\n[STRATEGY ({category})]\n{strategy[:400]}\n[/STRATEGY]"
 
     prompt = (
-        f'{strategy_block}'
         f'Tweet by @{author} (category: {category}):\n"{tweet_text[:350]}"\n\n'
-        f'Write a sharp, value-add reply:'
+        f'Write a sharp, value-add reply:{strategy_block}'
     )
     claude_bin = (
         "/Users/lessie/.local/bin/claude"
