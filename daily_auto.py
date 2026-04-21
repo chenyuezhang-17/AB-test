@@ -413,6 +413,20 @@ def post_s2(row):
 
 # ─── KOL engagement ────────────────────────────────────────────────────────
 
+# Skip tweets touching politics / news media — off-brand for Leego
+POLITICAL_SIGNALS = [
+    "trump", "biden", "harris", "democrat", "republican", "gop", "maga",
+    "congress", "senate", "election", "impeach", "tariff", "white house",
+    "president", "administration", "nato", "ukraine", "gaza", "israel",
+    "political", "politician", "vote", "ballot", "legislation", "bill passed",
+    "breaking news", "bbc news", "cnn", "fox news", "nbc news", "abc news",
+    "reuters", "ap news", "bloomberg news", "insider trading allegation",
+]
+
+def _is_political(text: str) -> bool:
+    t = text.lower()
+    return any(sig in t for sig in POLITICAL_SIGNALS)
+
 # Multi-pool KOL config — each category has seeds + discovery queries + weight
 KOL_POOLS = {
     "tech": {
@@ -711,6 +725,10 @@ def engage_kol():
             if not full_text or len(full_text) < 15:
                 log(f"  ✗ couldn't read @{tweet['author']} tweet, skipping")
                 continue
+            # Skip political / news content
+            if _is_political(full_text):
+                log(f"  [kol skip] @{tweet['author']} — political/news content, skipping")
+                continue
             log(f"  Generating reply for @{tweet['author']} [{kol_category}]: '{full_text[:80]}'...")
             reply = _generate_kol_reply(full_text, tweet["author"], category=kol_category)
             if reply:
@@ -734,16 +752,31 @@ def engage_kol():
                             break
                         time.sleep(1)
 
+                    # CDP click for real focus, then type full text at once
                     import json as _json
-                    ins = _bw_alliiexia("eval", f"""(function(){{
+                    rect = _bw_alliiexia("eval", """(function(){
                         const boxes = document.querySelectorAll('[data-testid="tweetTextarea_0"][role="textbox"]');
                         const el = boxes[boxes.length - 1];
-                        if (!el) return 'not_found';
-                        el.focus(); el.click();
-                        document.execCommand('selectAll');
-                        document.execCommand('insertText', false, {_json.dumps(reply)});
-                        return el.innerText.trim().length > 0 ? 'ok' : 'empty';
-                    }})()""", timeout=15)
+                        if (!el) return null;
+                        const r = el.getBoundingClientRect();
+                        return JSON.stringify({x: Math.round(r.left + r.width/2), y: Math.round(r.top + 10)});
+                    })()""", timeout=10)
+                    coords = _json.loads(rect.get("value") or "null")
+                    if coords:
+                        _bw_alliiexia("click_xy", f"{coords['x']},{coords['y']}")
+                        time.sleep(0.3)
+                    _bw_alliiexia("eval", """(function(){
+                        const boxes = document.querySelectorAll('[data-testid="tweetTextarea_0"][role="textbox"]');
+                        const el = boxes[boxes.length - 1];
+                        if (el) { el.click(); el.focus(); }
+                    })()""", timeout=5)
+                    _bw_alliiexia("type", reply, timeout=60)
+                    time.sleep(1)
+                    ins = _bw_alliiexia("eval", """(function(){
+                        const boxes = document.querySelectorAll('[data-testid="tweetTextarea_0"][role="textbox"]');
+                        const el = boxes[boxes.length - 1];
+                        return (el && el.innerText.trim().length > 0) ? 'ok' : 'empty';
+                    })()""", timeout=8)
 
                     if ins.get("value") == "ok":
                         time.sleep(1.5)
