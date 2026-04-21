@@ -269,28 +269,28 @@ def _collect_reply_candidates(n: int = 15) -> list[dict]:
         time.sleep(3)
         bw("eval", "window.scrollBy(0, 400)", timeout=10)
         time.sleep(2)
-    result = bw("eval", """(function(){
-        const articles = document.querySelectorAll('article[data-testid="tweet"]');
-        const out = [];
-        articles.forEach(function(a) {
-            const links = a.querySelectorAll('a[href*="/status/"]');
-            const textEl = a.querySelector('[data-testid="tweetText"]');
-            const userEl = a.querySelector('[data-testid="User-Name"] a');
-            let username = '';
-            if (userEl) {
-                const m = userEl.href.match(/x\\.com\\/([^/]+)/);
-                if (m) username = m[1];
-            }
-            for (const l of links) {
-                const m = l.href.match(/x\\.com\\/[^/]+\\/status\\/(\\d+)/);
-                if (m && username && username !== 'Leegowlessie') {
-                    out.push({url: l.href, text: textEl ? textEl.innerText.slice(0,200) : '', author: username});
-                    break;
+        result = bw("eval", """(function(){
+            const articles = document.querySelectorAll('article[data-testid="tweet"]');
+            const out = [];
+            articles.forEach(function(a) {
+                const links = a.querySelectorAll('a[href*="/status/"]');
+                const textEl = a.querySelector('[data-testid="tweetText"]');
+                const userEl = a.querySelector('[data-testid="User-Name"] a');
+                let username = '';
+                if (userEl) {
+                    const m = userEl.href.match(/x\\.com\\/([^/]+)/);
+                    if (m) username = m[1];
                 }
-            }
-        });
-        return out;
-    })()""")
+                for (const l of links) {
+                    const m = l.href.match(/x\\.com\\/[^/]+\\/status\\/(\\d+)/);
+                    if (m && username && username !== 'Leegowlessie') {
+                        out.push({url: l.href, text: textEl ? textEl.innerText.slice(0,200) : '', author: username});
+                        break;
+                    }
+                }
+            });
+            return out;
+        })()""")
         home_results = result.get("value") or []
         candidates += home_results
         if home_results:
