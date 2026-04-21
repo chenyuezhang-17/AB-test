@@ -935,8 +935,17 @@ def main():
             ensure_browser()
 
             if stype == 's1':
-                post_s1(row)
-                posted_count += 1
+                # Retry up to 3 times on failure
+                for s1_attempt in range(3):
+                    ok = post_s1(row)
+                    if ok:
+                        posted_count += 1
+                        break
+                    if s1_attempt < 2:
+                        log(f"  S1 failed (attempt {s1_attempt+1}/3), retrying in 30s...")
+                        time.sleep(30)
+                else:
+                    log(f"  S1 failed after 3 attempts, skipping")
             else:
                 result = post_s2(row)
                 if result == "ok":
