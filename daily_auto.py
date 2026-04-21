@@ -437,6 +437,28 @@ def _is_lessie_related(text: str, author: str = "") -> bool:
         return True
     return any(sig in t for sig in LESSIE_SIGNALS)
 
+# AI image/video generation tool accounts — off-brand for Leego to engage
+AI_VISUAL_TOOL_ACCOUNTS = {
+    "krea_ai", "runwayml", "heygen_official", "synthesia_io", "pika_labs",
+    "luma_ai", "stability_ai", "midjourney", "openai_dall_e", "adobe_firefly",
+    "invideo_ai", "descript", "capcut", "kling_ai", "hailuo_ai", "sora",
+    "magnific_ai", "topazlabs", "adobepremiere", "canva", "veed_io",
+}
+AI_VISUAL_TOOL_SIGNALS = [
+    "realtime edit", "real-time edit", "text to video", "text-to-video",
+    "image generation", "video generation", "ai image", "ai video",
+    "diffusion model", "stable diffusion", "midjourney", "dall-e", "dall·e",
+    "flux model", "generative image", "generative video", "video ai",
+    "ai art", "image editing ai", "inpainting", "outpainting",
+    "nano banana", "realtime image",
+]
+
+def _is_ai_visual_tool(text: str, author: str = "") -> bool:
+    if author.lower() in AI_VISUAL_TOOL_ACCOUNTS:
+        return True
+    t = text.lower()
+    return any(sig in t for sig in AI_VISUAL_TOOL_SIGNALS)
+
 # Multi-pool KOL config — each category has seeds + discovery queries + weight
 KOL_POOLS = {
     "tech": {
@@ -742,6 +764,10 @@ def engage_kol():
             # Skip Lessie AI related content
             if _is_lessie_related(full_text, tweet.get("author", "")):
                 log(f"  [kol skip] @{tweet['author']} — Lessie-related content, skipping")
+                continue
+            # Skip AI image/video generation tool accounts and content
+            if _is_ai_visual_tool(full_text, tweet.get("author", "")):
+                log(f"  [kol skip] @{tweet['author']} — AI visual tool content, skipping")
                 continue
             log(f"  Generating reply for @{tweet['author']} [{kol_category}]: '{full_text[:80]}'...")
             reply = _generate_kol_reply(full_text, tweet["author"], category=kol_category)
