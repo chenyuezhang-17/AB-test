@@ -70,8 +70,14 @@ def create_share_link_cdp(search_prompt: str) -> tuple[str | None, int]:
 
     Returns: (url, total_found) — url is None on failure, total_found may be 0 if not reported
     """
-    if not _session_alive():
-        print("[share_cdp] Browser session not running, skipping CDP method")
+    # Retry ping up to 3 times — session may have just restarted and not yet stable
+    for attempt in range(3):
+        if _session_alive():
+            break
+        print(f"[share_cdp] Session not ready, waiting 3s (attempt {attempt+1}/3)...")
+        time.sleep(3)
+    else:
+        print("[share_cdp] Browser session not running after retries, skipping")
         return None, 0
 
     try:

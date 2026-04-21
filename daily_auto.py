@@ -176,7 +176,7 @@ def pick_s2_candidates(n=3):
 
     suspended = set(
         r[0] for r in conn.execute(
-            "SELECT tweet_id FROM activity_log WHERE detail='suspended' OR detail='deleted'"
+            "SELECT tweet_id FROM activity_log WHERE detail IN ('suspended', 'deleted', 'failed')"
         ).fetchall()
     )
 
