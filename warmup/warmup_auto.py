@@ -259,13 +259,16 @@ def run_likes():
 
 def _collect_reply_candidates(n: int = 15) -> list[dict]:
     """Collect tweet candidates from home timeline + search, verify they load."""
+    from warmup.browser import ensure_session
     candidates = []
 
     # 1. Home timeline — most reliable (tweets are fresh and valid)
-    bw("goto", "https://x.com/home", timeout=20)
-    time.sleep(3)
-    bw("eval", "window.scrollBy(0, 400)", timeout=10)
-    time.sleep(2)
+    # Retry up to 3x: session may have just restarted and not yet served articles
+    for attempt in range(3):
+        bw("goto", "https://x.com/home", timeout=20)
+        time.sleep(3)
+        bw("eval", "window.scrollBy(0, 400)", timeout=10)
+        time.sleep(2)
     result = bw("eval", """(function(){
         const articles = document.querySelectorAll('article[data-testid="tweet"]');
         const out = [];
@@ -288,7 +291,13 @@ def _collect_reply_candidates(n: int = 15) -> list[dict]:
         });
         return out;
     })()""")
-    candidates += result.get("value") or []
+        home_results = result.get("value") or []
+        candidates += home_results
+        if home_results:
+            break
+        log(f"  Home timeline empty (attempt {attempt+1}/3), retrying in 5s...")
+        ensure_session()
+        time.sleep(5)
 
     # 2. One search query as supplement
     import urllib.parse
