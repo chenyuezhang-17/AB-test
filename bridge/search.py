@@ -73,28 +73,35 @@ def _build_search_prompt(tweet_text: str, author: str = "") -> str:
     return tweet_text[:400] or f"{author} hiring talent"
 
 
-def _create_share_link(checkpoint: str) -> tuple[str | None, int]:
+def _create_share_link(checkpoint: str, max_retries: int = 3) -> tuple[str | None, int]:
     """Create a Lessie share link. Returns (url, total_found).
 
     Tries JWT first (fast), then CDP (uses browser cookies).
-    CDP is the primary working method — JWT expires every ~7 days.
+    Retries up to max_retries times on failure.
     """
-    # Method 1: JWT (fast, no browser session needed)
-    url = _create_share_link_jwt(checkpoint)
-    if url:
-        return url, 0  # JWT path doesn't return count
-
-    # Method 2: CDP (uses browser's auth cookies, also returns result count)
-    print("[bridge] JWT failed, trying CDP...")
-    try:
-        from bridge.share_cdp import create_share_link_cdp
-        url, total = create_share_link_cdp(checkpoint)
+    import time as _time
+    for attempt in range(1, max_retries + 1):
+        # Method 1: JWT (fast, no browser session needed)
+        url = _create_share_link_jwt(checkpoint)
         if url:
-            return url, total
-    except Exception as e:
-        print(f"[bridge] CDP error: {e}")
+            return url, 0  # JWT path doesn't return count
 
-    print("[bridge] Both JWT and CDP methods failed")
+        # Method 2: CDP (uses browser's auth cookies, also returns result count)
+        print(f"[bridge] JWT failed, trying CDP (attempt {attempt}/{max_retries})...")
+        try:
+            from bridge.share_cdp import create_share_link_cdp
+            url, total = create_share_link_cdp(checkpoint)
+            if url:
+                return url, total
+        except Exception as e:
+            print(f"[bridge] CDP error: {e}")
+
+        if attempt < max_retries:
+            wait = attempt * 10
+            print(f"[bridge] Both methods failed, retrying in {wait}s...")
+            _time.sleep(wait)
+
+    print(f"[bridge] Share link failed after {max_retries} attempts")
     return None, 0
 
 
