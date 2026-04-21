@@ -427,6 +427,16 @@ def _is_political(text: str) -> bool:
     t = text.lower()
     return any(sig in t for sig in POLITICAL_SIGNALS)
 
+# Skip tweets mentioning Lessie AI (self-promotion, awkward to reply as Leego)
+LESSIE_SIGNALS = ["lessie", "lessie.ai", "lessie ai", "leego"]
+LESSIE_ACCOUNTS = {"lessie_ai", "guosiqiithaqua", "leegowlessie"}
+
+def _is_lessie_related(text: str, author: str = "") -> bool:
+    t = text.lower()
+    if author.lower() in LESSIE_ACCOUNTS:
+        return True
+    return any(sig in t for sig in LESSIE_SIGNALS)
+
 # Multi-pool KOL config — each category has seeds + discovery queries + weight
 KOL_POOLS = {
     "tech": {
@@ -728,6 +738,10 @@ def engage_kol():
             # Skip political / news content
             if _is_political(full_text):
                 log(f"  [kol skip] @{tweet['author']} — political/news content, skipping")
+                continue
+            # Skip Lessie AI related content
+            if _is_lessie_related(full_text, tweet.get("author", "")):
+                log(f"  [kol skip] @{tweet['author']} — Lessie-related content, skipping")
                 continue
             log(f"  Generating reply for @{tweet['author']} [{kol_category}]: '{full_text[:80]}'...")
             reply = _generate_kol_reply(full_text, tweet["author"], category=kol_category)
