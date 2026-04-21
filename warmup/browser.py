@@ -208,22 +208,38 @@ def reply_to_tweet(tweet_url: str, reply_text: str) -> bool:
             break
         time.sleep(1)
 
-    # Insert text using execCommand — most reliable for Twitter's React compose
+    # Get coordinates of reply compose box and use CDP click for real focus
     import json as _json
-    insert = bw("eval", f"""(function(){{
+    rect = bw("eval", """(function(){
         const boxes = document.querySelectorAll('[data-testid="tweetTextarea_0"][role="textbox"]');
-        // Use the last box — on tweet detail page, last one is the reply compose
         const el = boxes[boxes.length - 1];
-        if (!el) return 'not_found';
-        el.focus();
-        el.click();
-        document.execCommand('selectAll');
-        document.execCommand('insertText', false, {_json.dumps(reply_text)});
-        return el.innerText.trim().length > 0 ? 'ok' : 'empty';
-    }})()""", timeout=15)
-    if insert.get("value") != "ok":
+        if (!el) return null;
+        const r = el.getBoundingClientRect();
+        return JSON.stringify({x: Math.round(r.left + r.width/2), y: Math.round(r.top + 10)});
+    })()""", timeout=10)
+    coords = _json.loads(rect.get("value") or "null")
+    if not coords:
         return False
-    time.sleep(1.5)
+    bw("click_xy", f"{coords['x']},{coords['y']}")
+    time.sleep(0.3)
+    # Also JS focus on the box
+    bw("eval", """(function(){
+        const boxes = document.querySelectorAll('[data-testid="tweetTextarea_0"][role="textbox"]');
+        const el = boxes[boxes.length - 1];
+        if (el) { el.click(); el.focus(); }
+    })()""", timeout=5)
+    # Type via CDP Input.insertText (works with DraftJS)
+    bw("type", reply_text, timeout=60)
+    time.sleep(1)
+    # Verify text was inserted
+    check_text = bw("eval", """(function(){
+        const boxes = document.querySelectorAll('[data-testid="tweetTextarea_0"][role="textbox"]');
+        const el = boxes[boxes.length - 1];
+        return el ? el.innerText.trim().length : 0;
+    })()""", timeout=8)
+    if not (check_text.get("value") or 0) > 0:
+        return False
+    time.sleep(0.5)
 
     # Click the Reply button (find button with text "Reply" that is not disabled)
     click = bw("eval", """(function(){

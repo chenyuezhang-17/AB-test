@@ -81,9 +81,9 @@ def generate_tweet() -> str | None:
     strategy = load_warmup_strategy(topic="content")
     strategy_block = ""
     if strategy:
-        strategy_block = f"\n--- STRATEGY (from past performance) ---\n{strategy[:500]}\n---\n\n"
+        strategy_block = f"\n[STRATEGY from past performance]\n{strategy[:500]}\n[/STRATEGY]\n\n"
 
-    prompt = f"{strategy_block}Today's theme: {THEMES[theme]}\n\nWrite one tweet."
+    prompt = f"Today's theme: {THEMES[theme]}\n\nWrite one tweet.{strategy_block}"
 
     claude_bin = (
         "/Users/lessie/.local/bin/claude"
@@ -132,8 +132,8 @@ Output: just the reply text."""
     strategy = load_warmup_strategy(topic="engagement")
     strategy_block = ""
     if strategy:
-        strategy_block = f"--- STRATEGY ---\n{strategy[:400]}\n---\n\n"
-    prompt = f'{strategy_block}Tweet by @{author}:\n"{tweet_text[:300]}"\n\nWrite a value-add reply:'
+        strategy_block = f"\n[STRATEGY]\n{strategy[:400]}\n[/STRATEGY]"
+    prompt = f'Tweet by @{author}:\n"{tweet_text[:300]}"\n\nWrite a value-add reply:{strategy_block}'
     claude_bin = (
         "/Users/lessie/.local/bin/claude"
         if os.path.exists("/Users/lessie/.local/bin/claude")
