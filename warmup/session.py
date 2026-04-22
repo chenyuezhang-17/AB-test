@@ -16,9 +16,10 @@ sys.path.insert(0, str(Path(__file__).parent.parent / "action"))
 
 from browser.controller import BrowserController
 
-SOCKET_PATH = "/tmp/leegowlessie-browser.sock"
-PID_FILE    = "/tmp/leegowlessie-browser.pid"
-CDP_URL     = "http://localhost:9223"
+_PORT       = os.environ.get("CHROME_PORT", "9223")
+SOCKET_PATH = f"/tmp/leego-browser-{_PORT}.sock"
+PID_FILE    = f"/tmp/leego-browser-{_PORT}.pid"
+CDP_URL     = f"http://localhost:{_PORT}"
 
 
 async def handle_client(reader, writer, ctrl):

@@ -11,14 +11,9 @@
         <string>/Users/lessie/cc/AB-test/scripts/run_warmup.sh</string>
     </array>
 
-    <!-- Run at 10:00 AM every day -->
-    <key>StartCalendarInterval</key>
-    <dict>
-        <key>Hour</key>
-        <integer>10</integer>
-        <key>Minute</key>
-        <integer>0</integer>
-    </dict>
+    <!-- Every hour — script checks PT time internally -->
+    <key>StartInterval</key>
+    <integer>3600</integer>
 
     <key>StandardOutPath</key>
     <string>/tmp/leegowlessie_warmup_launchd.log</string>

@@ -8,10 +8,12 @@ import sys
 import time
 from pathlib import Path
 
-SOCKET_PATH = "/tmp/leegowlessie-browser.sock"
-PID_FILE    = "/tmp/leegowlessie-browser.pid"
-CDP_URL     = "http://localhost:9223"
-ACCOUNT     = "Leegowlessie"   # Twitter handle (no @)
+import os as _os
+_PORT       = _os.environ.get("CHROME_PORT", "9223")
+SOCKET_PATH = f"/tmp/leego-browser-{_PORT}.sock"
+PID_FILE    = f"/tmp/leego-browser-{_PORT}.pid"
+CDP_URL     = f"http://localhost:{_PORT}"
+ACCOUNT     = _os.environ.get("TWITTER_ACCOUNT", "Leegowlessie")
 
 
 # ─── session management ────────────────────────────────────────────────────
@@ -152,31 +154,36 @@ def like_tweet(tweet_url: str) -> bool:
 
 
 def like_tweets_on_timeline(n: int = 5) -> int:
-    """Like up to n tweets from the current page (call after navigating to timeline/search)."""
+    """Like up to n tweets from the current page, one at a time with human-like delays."""
+    import random
     liked = 0
     for scroll_round in range(4):
-        remaining = n - liked
-        if remaining <= 0:
-            break
-        result = bw("eval", f"""(function(){{
-            const btns = document.querySelectorAll('[data-testid="like"]');
-            let count = 0;
-            for (const btn of btns) {{
-                if (count >= {remaining}) break;
-                const label = btn.getAttribute('aria-label') || '';
-                if (!label.toLowerCase().includes('liked')) {{
-                    btn.click();
-                    count++;
-                }}
-            }}
-            return count;
-        }})()""", timeout=20)
-        liked += int(result.get("value") or 0)
         if liked >= n:
             break
-        # Scroll via JS directly — more reliable than socket scroll command
+        # Find unliked buttons
+        result = bw("eval", """(function(){
+            const btns = document.querySelectorAll('[data-testid="like"]');
+            let indices = [];
+            for (let i = 0; i < btns.length; i++) {
+                const label = btns[i].getAttribute('aria-label') || '';
+                if (!label.toLowerCase().includes('liked')) indices.push(i);
+            }
+            return JSON.stringify(indices);
+        })()""", timeout=20)
+        indices = json.loads(result.get("value") or "[]") if result.get("value") else []
+        for idx in indices:
+            if liked >= n:
+                break
+            bw("eval", f"""(function(){{
+                const btns = document.querySelectorAll('[data-testid="like"]');
+                if (btns[{idx}]) btns[{idx}].click();
+            }})()""", timeout=10)
+            liked += 1
+            time.sleep(random.uniform(8, 20))  # human-like gap between likes
+        if liked >= n:
+            break
         bw("eval", "window.scrollBy(0, 800)", timeout=10)
-        time.sleep(2.5)
+        time.sleep(random.uniform(3, 6))
     return liked
 
 

@@ -6,6 +6,9 @@ Lessie Twitter 全自动日更系统 (Daemon Mode)
 3. 晚上：抓取互动数据 + 运行学习系统更新策略记忆
 """
 import sys, os, time, json, sqlite3, datetime, subprocess, random
+from zoneinfo import ZoneInfo
+
+_PT = ZoneInfo("America/Los_Angeles")
 sys.path.insert(0, '/Users/lessie/cc/AB-test')
 
 from dotenv import load_dotenv
@@ -39,11 +42,17 @@ def log(msg):
 def ensure_browser():
     if not _is_session_running():
         log("Browser session dead — restarting...")
+        env = os.environ.copy()
+        for k in ("ALL_PROXY", "HTTP_PROXY", "HTTPS_PROXY", "all_proxy", "http_proxy", "https_proxy"):
+            env.pop(k, None)
+        env["NO_PROXY"] = "*"
+        env["no_proxy"] = "*"
         subprocess.Popen(
             [sys.executable, "-m", "browser.session"],
             cwd="/Users/lessie/cc/AB-test/action",
             stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
-            start_new_session=True
+            start_new_session=True,
+            env=env,
         )
         time.sleep(7)
     return True
@@ -54,8 +63,17 @@ def learn_from_yesterday():
     """Read yesterday's engagement, log insights for prompt tuning."""
     yesterday = (datetime.date.today() - datetime.timedelta(days=1)).isoformat()
     conn = sqlite3.connect(DB)
+    conn.execute("""CREATE TABLE IF NOT EXISTS posted_tweets (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        posted_at TEXT NOT NULL, our_tweet_id TEXT UNIQUE,
+        original_tweet_id TEXT, reply_text TEXT, lessie_url TEXT,
+        scene TEXT,
+        views INTEGER DEFAULT 0, retweets INTEGER DEFAULT 0,
+        likes INTEGER DEFAULT 0, replies INTEGER DEFAULT 0,
+        last_synced TEXT
+    )""")
     rows = conn.execute("""
-        SELECT scene, reply_text, lessie_url, views, likes, retweets, our_tweet_url
+        SELECT scene, reply_text, lessie_url, views, likes, retweets, our_tweet_id
         FROM posted_tweets
         WHERE posted_at LIKE ? ORDER BY views DESC
     """, (f"{yesterday}%",)).fetchall()
@@ -725,9 +743,10 @@ def engage_kol():
 # ─── daemon helpers ────────────────────────────────────────────────────────
 
 def _time_today(hour, minute=0):
-    """Create a datetime for today at the given hour:minute."""
-    return datetime.datetime.combine(datetime.date.today(),
-                                     datetime.time(hour, minute))
+    """Create datetime for today-in-PT at hour:minute, returned as naive local time."""
+    pt_now = datetime.datetime.now(_PT)
+    pt_target = pt_now.replace(hour=hour, minute=minute, second=0, microsecond=0)
+    return pt_target.astimezone().replace(tzinfo=None)
 
 def _wait_until(target):
     """Sleep until target datetime, checking every 60s."""
@@ -761,6 +780,10 @@ def main():
     global _strategy_ctx
     today = datetime.date.today().isoformat()
     log(f"=== Leego Daily Daemon [{today}] starting ===")
+
+    # Ensure all DB tables exist
+    from db_log import _conn as _ensure_db
+    _ensure_db().close()
 
     # ── Phase 1: Morning prep ──
     _strategy_ctx = load_strategy(account="alliiexia")
@@ -806,15 +829,15 @@ def main():
 
     log(f"Plan: {len(plan)} posts, {len(s2_queue)} S2 backups")
 
-    # ── Phase 3: Build daily schedule ──
-    now = datetime.datetime.now()
-    start_hour = max(now.hour + 1, 10)  # earliest: 10am or next hour
-    end_hour = 20                        # latest post: 8pm
+    # ── Phase 3: Build daily schedule (Pacific Time) ──
+    now_pt = datetime.datetime.now(_PT)
+    start_hour = max(now_pt.hour + 1, 10)  # earliest: 10am PT or next hour
+    end_hour = 20                           # latest post: 8pm PT
+    log(f"PT time: {now_pt.strftime('%H:%M')}, schedule window: {start_hour}:00-{end_hour}:00 PT")
 
     if start_hour >= end_hour:
-        # Too late — run everything immediately (burst mode fallback)
-        log("Late start — posting all now (burst mode)")
-        post_times = [now + datetime.timedelta(seconds=i * 30) for i in range(len(plan))]
+        log(f"PT {now_pt.strftime('%H:%M')} is outside active window — skipping until tomorrow")
+        return
     else:
         post_times = _spread_times(len(plan), start_hour, end_hour)
 
@@ -835,12 +858,17 @@ def main():
     log(f"Schedule: {len(events)} events from {events[0][0].strftime('%H:%M') if events else '?'} "
         f"to {events[-1][0].strftime('%H:%M') if events else '?'}")
 
-    # ── Phase 4: Execute schedule ──
+    # ── Phase 4: Execute schedule — skip past slots, never batch expired tasks ──
     posted_count = 0
     for target_time, event_type, data in events:
-        # Wait until scheduled time
-        if target_time > datetime.datetime.now():
-            wait_min = (target_time - datetime.datetime.now()).total_seconds() / 60
+        now = datetime.datetime.now()
+        if target_time < now:
+            lag = (now - target_time).total_seconds() / 60
+            if lag > 10:
+                log(f"SKIP {event_type} — slot was {int(lag)}min ago, not catching up")
+                continue
+        elif target_time > now:
+            wait_min = (target_time - now).total_seconds() / 60
             log(f"Next: {event_type} at {target_time.strftime('%H:%M')} ({int(wait_min)}min away)")
             _wait_until(target_time)
 

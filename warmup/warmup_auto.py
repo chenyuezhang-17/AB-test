@@ -9,6 +9,9 @@
 """
 
 import sys, os, time, json, sqlite3, datetime, random
+from zoneinfo import ZoneInfo
+
+_PT = ZoneInfo("America/Los_Angeles")
 sys.path.insert(0, '/Users/lessie/cc/AB-test')
 
 from dotenv import load_dotenv
@@ -168,10 +171,10 @@ def run_follows():
         if ok:
             _log_action("follow", username)
             followed += 1
-            time.sleep(random.uniform(4, 8))  # human-like delay
+            time.sleep(random.uniform(30, 60))  # human-like delay
         else:
             log(f"  ✗ couldn't follow @{username}")
-        time.sleep(2)
+        time.sleep(random.uniform(10, 20))
     log(f"Follows: done {followed} new follows")
 
 
@@ -196,7 +199,7 @@ def run_likes():
             _log_action("like", query, f"liked {n}")
             liked_total += n
             log(f"  ✓ liked {n} tweets")
-        time.sleep(random.uniform(5, 10))
+        time.sleep(random.uniform(20, 45))
 
     log(f"Likes: done ~{liked_total} likes total today")
 
@@ -323,7 +326,7 @@ def run_replies():
             log(f"  ✓ replied to @{author}")
         else:
             log(f"  ✗ reply click failed for @{author}")
-        time.sleep(random.uniform(8, 15))
+        time.sleep(random.uniform(30, 60))
 
     log(f"Replies: done {replied} replies")
 
@@ -381,7 +384,7 @@ def run_retweets():
             log(f"  ✓ retweeted")
         else:
             log(f"  ✗ retweet failed")
-        time.sleep(random.uniform(5, 10))
+        time.sleep(random.uniform(20, 45))
 
     log(f"Retweets: done {retweeted}")
 
@@ -408,8 +411,10 @@ def run_original_post():
 # ─── Daemon helpers ────────────────────────────────────────────────────────
 
 def _time_today(hour, minute=0):
-    return datetime.datetime.combine(datetime.date.today(),
-                                     datetime.time(hour, minute))
+    """Create datetime for today-in-PT at hour:minute, returned as naive local time."""
+    pt_now = datetime.datetime.now(_PT)
+    pt_target = pt_now.replace(hour=hour, minute=minute, second=0, microsecond=0)
+    return pt_target.astimezone().replace(tzinfo=None)
 
 def _wait_until(target):
     while datetime.datetime.now() < target:
@@ -442,16 +447,17 @@ def main():
     _init_db()
 
     if not ensure_session():
-        log("Browser session failed. Is Leegowlessie Chrome on port 9223?")
+        log(f"Browser session failed. Is Chrome running on port {os.environ.get('CHROME_PORT', '9223')}?")
         log("  Run: scripts/launch_leegowlessie_browser.sh")
         return
 
     log("Browser session ready")
 
-    # Build schedule: spread 5 tasks across 10:00-18:00 with jitter
-    now = datetime.datetime.now()
-    start_hour = max(now.hour + 1, 10)
+    # Build schedule: spread 5 tasks across 10:00-18:00 PT
+    now_pt = datetime.datetime.now(_PT)
+    start_hour = max(now_pt.hour + 1, 10)
     end_hour = 18
+    log(f"PT time: {now_pt.strftime('%H:%M')}, schedule window: {start_hour}:00-{end_hour}:00 PT")
 
     tasks = [
         ("follows", run_follows),
@@ -462,9 +468,8 @@ def main():
     ]
 
     if start_hour >= end_hour:
-        # Late start — run all now
-        log("Late start — running all tasks now")
-        task_times = [now + datetime.timedelta(seconds=i * 30) for i in range(len(tasks))]
+        log(f"PT {now_pt.strftime('%H:%M')} is outside active window — skipping until tomorrow")
+        return
     else:
         # Spread across the day
         span = (end_hour - start_hour) * 60
@@ -474,10 +479,16 @@ def main():
             offset = int(i * slot) + random.randint(0, max(0, int(slot) - 1))
             task_times.append(_time_today(start_hour) + datetime.timedelta(minutes=offset))
 
-    # Execute schedule
+    # Execute schedule — skip past slots, never batch expired tasks
     for (task_name, task_fn), target_time in zip(tasks, task_times):
-        if target_time > datetime.datetime.now():
-            wait_min = (target_time - datetime.datetime.now()).total_seconds() / 60
+        now = datetime.datetime.now()
+        if target_time < now:
+            lag = (now - target_time).total_seconds() / 60
+            if lag > 10:
+                log(f"SKIP {task_name} — slot was {int(lag)}min ago, not catching up")
+                continue
+        elif target_time > now:
+            wait_min = (target_time - now).total_seconds() / 60
             log(f"Next: {task_name} at {target_time.strftime('%H:%M')} ({int(wait_min)}min away)")
             _wait_until(target_time)
 

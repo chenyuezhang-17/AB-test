@@ -13,9 +13,10 @@ from pathlib import Path
 
 from browser.controller import BrowserController
 
-SOCKET_PATH = "/tmp/social-browser.sock"
+_PORT = os.environ.get("CHROME_PORT", "9222")
+SOCKET_PATH = f"/tmp/leego-browser-{_PORT}.sock"
 PID_FILE = "/tmp/social-browser.pid"
-DEFAULT_CDP = "http://localhost:9222"
+DEFAULT_CDP = f"http://localhost:{_PORT}"
 
 
 async def handle_client(

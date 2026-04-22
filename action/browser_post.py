@@ -17,8 +17,11 @@ from pathlib import Path
 # Add browser module path
 sys.path.insert(0, str(Path(__file__).parent))
 
-CDP_URL = "http://localhost:9222"
-SOCKET_PATH = "/tmp/social-browser.sock"
+import os as _os
+_PORT = _os.environ.get("CHROME_PORT", "9222")
+_ACCOUNT = _os.environ.get("TWITTER_ACCOUNT", "alliiexia")
+CDP_URL = f"http://localhost:{_PORT}"
+SOCKET_PATH = f"/tmp/leego-browser-{_PORT}.sock"
 
 
 def _is_session_running() -> bool:
@@ -165,19 +168,19 @@ def post_tweet_browser(text: str) -> tuple[bool, str]:
 def _get_latest_reply_url(original_tweet_url: str) -> str | None:
     """Find our most recent reply by checking our Tweets & Replies tab."""
     try:
-        bw("goto", "https://x.com/alliiexia/with_replies", timeout=15)
+        bw("goto", f"https://x.com/{_ACCOUNT}/with_replies", timeout=15)
         time.sleep(4)
-        result = bw("eval", """(function(){
+        result = bw("eval", f"""(function(){{
             const articles = document.querySelectorAll('article[data-testid="tweet"]');
-            for (const a of articles) {
+            for (const a of articles) {{
                 const links = a.querySelectorAll('a[href*="/status/"]');
-                for (const l of links) {
-                    const m = l.href.match(/alliiexia\\/status\\/(\\d+)/);
-                    if (m) return 'https://x.com/alliiexia/status/' + m[1];
-                }
-            }
+                for (const l of links) {{
+                    const m = l.href.match(/{_ACCOUNT}\\/status\\/(\\d+)/);
+                    if (m) return 'https://x.com/{_ACCOUNT}/status/' + m[1];
+                }}
+            }}
             return null;
-        })()""")
+        }})()""")
         return result.get("value") or None
     except Exception:
         return None
@@ -186,29 +189,26 @@ def _get_latest_reply_url(original_tweet_url: str) -> str | None:
 def _get_latest_tweet_url() -> str | None:
     """Navigate to profile and return URL of the most recent (non-pinned) tweet."""
     try:
-        bw("goto", "https://x.com/alliiexia", timeout=15)
+        bw("goto", f"https://x.com/{_ACCOUNT}", timeout=15)
         time.sleep(3)
-        result = bw("eval", """(function(){
+        result = bw("eval", f"""(function(){{
             const articles = document.querySelectorAll('article[data-testid="tweet"]');
-            // Collect all tweet URLs with their datetime
             const candidates = [];
-            for (const a of articles) {
-                // Skip pinned tweets
+            for (const a of articles) {{
                 const social = a.closest('[data-testid="cellInnerDiv"]');
                 if (social && social.innerText.includes('Pinned')) continue;
                 const timeEl = a.querySelector('time');
                 const dt = timeEl ? timeEl.getAttribute('datetime') : '';
                 const links = a.querySelectorAll('a[href*="/status/"]');
-                for (const l of links) {
-                    const m = l.href.match(/alliiexia\\/status\\/(\\d+)/);
-                    if (m) { candidates.push({url: l.href, dt: dt, id: parseInt(m[1])}); break; }
-                }
-            }
-            // Return the one with the largest tweet ID (most recent)
+                for (const l of links) {{
+                    const m = l.href.match(/{_ACCOUNT}\\/status\\/(\\d+)/);
+                    if (m) {{ candidates.push({{url: l.href, dt: dt, id: parseInt(m[1])}}); break; }}
+                }}
+            }}
             if (!candidates.length) return null;
             candidates.sort((a, b) => b.id - a.id);
             return candidates[0].url;
-        })()""")
+        }})()""")
         return result.get("value") or None
     except Exception:
         return None

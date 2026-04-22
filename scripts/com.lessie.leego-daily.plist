@@ -11,14 +11,9 @@
         <string>/Users/lessie/cc/AB-test/scripts/run_daily.sh</string>
     </array>
 
-    <!-- Run at 9:05 AM every day -->
-    <key>StartCalendarInterval</key>
-    <dict>
-        <key>Hour</key>
-        <integer>9</integer>
-        <key>Minute</key>
-        <integer>5</integer>
-    </dict>
+    <!-- Every hour — script checks PT time internally -->
+    <key>StartInterval</key>
+    <integer>3600</integer>
 
     <key>StandardOutPath</key>
     <string>/tmp/lessie_daily_launchd.log</string>
