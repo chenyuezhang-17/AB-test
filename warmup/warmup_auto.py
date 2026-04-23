@@ -97,6 +97,20 @@ def _is_non_na(location: str, bio: str) -> bool:
     text = (location + " " + bio).lower()
     return any(sig in text for sig in NON_NA_BIO_SIGNALS)
 
+# Skip political / news content in replies — off-brand for Leegowlessie
+POLITICAL_REPLY_SIGNALS = [
+    "trump", "biden", "harris", "democrat", "republican", "gop", "maga",
+    "congress", "senate", "election", "impeach", "tariff", "white house",
+    "president", "administration", "nato", "ukraine", "gaza", "israel",
+    "political", "politician", "vote", "ballot", "legislation", "bill passed",
+    "breaking news", "bbc news", "cnn", "fox news", "nbc news", "splc",
+    "outrageous", "need to go to prison", "prison for a long time",
+]
+
+def _is_political_tweet(text: str) -> bool:
+    t = text.lower()
+    return any(sig in t for sig in POLITICAL_REPLY_SIGNALS)
+
 # ─── Daily limits ──────────────────────────────────────────────────────────
 DAILY_FOLLOWS  = 1
 DAILY_LIKES    = 25
@@ -376,6 +390,11 @@ def run_replies():
         check = bw("eval", "document.querySelector('[data-testid=\"reply\"]') ? 'ok' : 'no'", timeout=8)
         if check.get("value") != "ok":
             log(f"  ✗ @{author} no reply button, skipping")
+            continue
+
+        # Skip political / news content
+        if _is_political_tweet(full_text):
+            log(f"  ✗ @{author} — political/news content, skipping")
             continue
 
         log(f"  Generating reply for @{author}: '{full_text[:80]}'...")
