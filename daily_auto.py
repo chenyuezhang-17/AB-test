@@ -218,6 +218,49 @@ def mark_trend_posted(tid):
     conn.execute("UPDATE trend_candidates SET status='posted' WHERE id=?", (tid,))
     conn.commit(); conn.close()
 
+# ─── Feishu draft push (webhook) ───────────────────────────────────────────
+
+FEISHU_WEBHOOK = "https://open.feishu.cn/open-apis/bot/v2/hook/2128c666-95c6-4274-b954-de193dad0eb0"
+
+def _push_feishu_draft(scene: str, tweet_text: str, original_url: str = "",
+                       author: str = "", intent: str = ""):
+    """Send a tweet draft to Feishu group for manual posting."""
+    import urllib.request
+    title = f"🐦 {scene} Draft"
+    lines = []
+    if author:
+        lines.append(f"Reply to: @{author} ({intent})")
+        lines.append(f"Original: {original_url}")
+        lines.append("")
+    lines.append("── Copy & paste ──")
+    lines.append(tweet_text)
+    if original_url and "quote" not in scene.lower():
+        lines.append("")
+        lines.append(f"Quote: {original_url}")
+
+    body = json.dumps({
+        "msg_type": "post",
+        "content": {
+            "post": {
+                "en_us": {
+                    "title": title,
+                    "content": [[{"tag": "text", "text": "\n".join(lines)}]]
+                }
+            }
+        }
+    }).encode()
+    try:
+        req = urllib.request.Request(FEISHU_WEBHOOK, data=body,
+                                     headers={"Content-Type": "application/json"})
+        resp = urllib.request.urlopen(req, timeout=10)
+        ok = resp.status == 200
+        if ok:
+            log(f"  📮 Feishu draft sent ({scene})")
+        return ok
+    except Exception as e:
+        log(f"  ✗ Feishu push failed: {e}")
+        return False
+
 # ─── post functions ────────────────────────────────────────────────────────
 
 def post_s1(row):
@@ -229,18 +272,16 @@ def post_s1(row):
         log(f"S1 ✗ share link failed, skipping (won't post homepage link)")
         return False
     tweet_text = f"{hook}\n\n{share_url}"
-    log(f"S1 posting: {tweet_text[:90]}...")
-    ensure_browser()
-    ok, url = post_tweet_browser(tweet_text)
+    log(f"S1 draft: {tweet_text[:90]}...")
+    ok = _push_feishu_draft("S1 Trend Post", tweet_text)
     if ok:
-        log(f"S1 ✓ {url}")
+        log(f"S1 ✓ draft sent to Feishu")
         log_action(reply_text=tweet_text, lessie_url=share_url,
-                   scene="Scene 1: Trends",
-                   our_tweet_url=url if url.startswith("http") else "")
+                   scene="Scene 1: Trends", our_tweet_url="draft")
         mark_trend_posted(tid)
         return True
     else:
-        log(f"S1 ✗ {url}")
+        log(f"S1 ✗ Feishu push failed")
         return False
 
 def _mark_tweet_dead(tweet_id: str, reason: str = "deleted"):
@@ -350,27 +391,18 @@ def post_s2(row):
         log(f"S2 ✗ @{author} — reply generation failed, skipping to next candidate")
         return "error"
     reply = f"{reply_text}\n\n{share_url}"
-    log(f"S2 posting @{author} [{intent}]: {reply_text[:100]}")
-    ensure_browser()
-    ok, result = post_quote_browser(tweet_url, reply)
+    log(f"S2 draft @{author} [{intent}]: {reply_text[:100]}")
+    ok = _push_feishu_draft("S2 Quote Reply", reply,
+                            original_url=tweet_url, author=author, intent=intent)
     if ok:
-        log(f"S2 ✓ {result}")
+        log(f"S2 ✓ draft sent to Feishu")
         log_action(reply_text=reply, lessie_url=share_url,
                    original_tweet_id=tweet_id, author=author,
-                   scene="Scene 2: Intent",
-                   our_tweet_url=result if result.startswith("http") else "")
+                   scene="Scene 2: Intent", our_tweet_url="draft")
         return "ok"
     else:
-        # Detect "tweet deleted / account suspended" vs transient errors
-        err = str(result).lower()
-        if "tweet_deleted" in err or "retweet" in err or "no retweet" in err or "none" in err:
-            log(f"S2 ✗ @{author} — tweet deleted or account suspended, skipping")
-            _mark_tweet_dead(tweet_id, "deleted")
-            return "deleted"
-        else:
-            log(f"S2 ✗ @{author} — {result}, skipping")
-            _mark_tweet_dead(tweet_id, "failed")
-            return "error"
+        log(f"S2 ✗ Feishu push failed for @{author}")
+        return "error"
 
 # ─── KOL engagement ────────────────────────────────────────────────────────
 
