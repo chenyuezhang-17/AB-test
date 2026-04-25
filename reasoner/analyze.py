@@ -19,7 +19,7 @@ from models import ScannedTweet, AnalyzedTweet
 load_dotenv()
 CLAUDE_BIN = os.getenv(
     "CLAUDE_BIN",
-    "/Users/lessie/Library/Application Support/Claude/claude-code/2.1.92/claude.app/Contents/MacOS/claude"
+    "/Users/lessie/.local/bin/claude"
 )
 
 INTENT_PROMPT = """You analyze tweets to detect people-search intent for Lessie, a people search engine.

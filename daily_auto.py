@@ -18,6 +18,8 @@ from action.browser_post import post_quote_browser, post_tweet_browser, _is_sess
 from bridge.search import _create_share_link, _build_search_prompt
 from db_log import log_action, scrape_engagement
 from scanner.trends import scan_trends
+from scanner.fetch import scan_tweets
+from reasoner.analyze import analyze_intent
 from db_log import save_trend_candidates, get_trend_candidates
 from learn import load_strategy, load_kol_strategy, update_all_strategies
 
@@ -811,6 +813,46 @@ def main():
             log(f"Trends: {len(trends)} found, {saved} saved")
         except Exception as e:
             log(f"Trend scan failed: {e}")
+
+    # ── Phase 1b: Scan tweets via TikHub API (no browser, no login) ──
+    conn_s2 = sqlite3.connect(DB)
+    existing_s2 = conn_s2.execute(
+        "SELECT count(*) FROM activity_log WHERE stage='reasoner' AND status='passed' AND ts LIKE ?",
+        (f"{today}%",)
+    ).fetchone()[0]
+    conn_s2.close()
+    if existing_s2 >= 5:
+        log(f"S2 scan: {existing_s2} candidates already found today, skipping")
+    else:
+        log("S2 scan: fetching tweets via TikHub API...")
+        try:
+            tweets = scan_tweets()
+            log(f"S2 scan: {len(tweets)} tweets from TikHub")
+            passed = 0
+            for tweet in tweets:
+                result = analyze_intent(tweet)
+                if result and result.confidence >= 0.9:
+                    conn_w = sqlite3.connect(DB)
+                    # Skip if already in DB
+                    exists = conn_w.execute(
+                        "SELECT 1 FROM activity_log WHERE tweet_id=? AND stage='reasoner'",
+                        (result.tweet_id,)
+                    ).fetchone()
+                    if not exists:
+                        conn_w.execute(
+                            "INSERT INTO activity_log (ts, stage, tweet_id, author, tweet_text, intent, confidence, status, detail) "
+                            "VALUES (?,?,?,?,?,?,?,?,?)",
+                            (datetime.datetime.now(datetime.timezone.utc).isoformat(),
+                             "reasoner", result.tweet_id, result.author,
+                             result.original_text[:500], result.intent,
+                             result.confidence, "passed", "tikhub")
+                        )
+                        conn_w.commit()
+                        passed += 1
+                    conn_w.close()
+            log(f"S2 scan: {passed} new candidates passed intent filter")
+        except Exception as e:
+            log(f"S2 scan failed: {e}")
 
     # ── Phase 2: Build post plan ──
     s1_picks = pick_s1_candidates(n=2)
